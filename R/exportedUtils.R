@@ -94,8 +94,20 @@ getFcsNEvents <- function(fcsFile) {
 viewSubjectCounts <- function(experiment){
   if(!is.discovrExperiment(experiment)){
     stop(
-      "The object passed to this function is not a valid DISCOV-R experiment object.
-      Please create your experiment using the 'setupExperiment' function and try again."
+      "The object passed to this function is not a valid DISCOV-R experiment object.",
+      "Please create your experiment using the 'setupExperiment' function and try again."
+    )
+  }
+  if (!'mergedExpr' %in% names(experiment)){
+    stop(
+      "The data passed to this function appears incorrectly formatted.",
+      "Please create your experiment using the 'setupExperiment' function and try again."
+    )
+  }
+  if (!'samp' %in% names(experiment$mergedExpr)){
+    stop(
+      "The data passed to this function appears incorrectly formatted.",
+      "Please create your experiment using the 'setupExperiment' function and try again."
     )
   }
   # Check for donors with too many/too few collected events
@@ -103,11 +115,40 @@ viewSubjectCounts <- function(experiment){
   group_by(.data$samp) %>%
   summarise(n_events = n(), .groups = "drop_last")
 
-  print(eventsByDonor)
-
   tryCatch (
     View(eventsByDonor),
     error = function(e){print(eventsByDonor)},
     warning = function(w){print(eventsByDonor)}
+  )
+}
+
+viewSubjectClusters <- function(experiment){
+  if(!is.discovrExperiment(experiment)){
+    stop(
+      "The object passed to this function is not a valid DISCOV-R experiment object.",
+      "Please create your experiment using the 'setupExperiment' function and try again."
+    )
+  }
+  if (!'mergedExpr' %in% names(experiment)){
+    stop(
+      "The data passed to this function appears incorrectly formatted.",
+      "Please create your experiment using the 'setupExperiment' function and try again."
+    )
+  }
+  if (!'RPclust' %in% names(experiment$mergedExpr)){
+    stop(
+      "The data passed to this function does not appear to have been clustered yet.",
+      "Please cluster your experiment using the 'clusterDiscovrExperiment' function and try again."
+    )
+  }
+  # Get summary of the number of clusters generated for each subject
+  nPhenoClusts <- mergedExpr %>%
+    group_by(samp) %>%
+    summarize(k_clusters = max(experiment$mergedExpr$RPclust))
+
+  tryCatch (
+    View(nPhenoClusts),
+    error = function(e){print(nPhenoClusts)},
+    warning = function(w){print(nPhenoClusts)}
   )
 }
