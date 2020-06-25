@@ -1,0 +1,29 @@
+Package: briDiscovr
+Type: Package
+Title: Distribution analysis across clusters of a parent population overlaid with a rare subpopulation
+Version: 0.1.0
+Authors@R: c(
+  person("Mario", "Rosasco", email = "mrosasco@benaroyaresearch.org", role = c("aut", "cre")),
+  person("Virginia", "Muir", role = c("ctb")))
+URL: https://github.com/BenaroyaResearch/briDiscovr
+Description: A package designed to facilitate the metaclustering analysis described in Wiedeman et al., 
+    2020, J Clin Invest. In brief, the approach defines phenotypic clusters from a parent population 
+    (eg: all CD8+ cells in PBMC) and then maps rare cells (eg: antigen-specific memory cells) on the 
+    parent population's phenotypic landscape to robustly characterize differences in the rare cells.
+License: file LICENSE
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.1.0
+LinkingTo: 
+    Rcpp
+biocViews:
+Imports: 
+    igraph(>= 1.0.1),
+    RANN(>= 2.5),
+    Rcpp (>= 0.12.0),
+    methods,
+    dplyr,
+    readr,
+    flowCore,
+    magrittr,
+    stringr
