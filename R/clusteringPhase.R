@@ -15,17 +15,17 @@
 #' whereas the others will not.
 #' @param fcsInfoFile A character string indicating the path to a file containing columns named "subject",
 #' "cellSubset", and "filename". The "filename" field must contain paths to the .fcs files that will be used in analysis.
-#' @param markerCommonField A character string indicating the name of a column containing common marker names for human use,
-#' like "CD45" (default: "fixed")
-#' @param markerFcsField A character string indicating the name of a column containing the marker names in the .fcs files,
-#' like "89Y_CD45" (default: "desc")
-#' @param arcsinhA (default: 0) A numeric indicating the value for 'a' in the arcsinh data transformation
-#' equation. Should usually be 0.
-#' @param arcsinhB (default: 0.2) A numeric indicating the value for 'b' in the arcsinh data transformation
-#' equation. Should be 1/5 for cytof data, and 1/150 for flow data.
-#' @param arcsinhC (default: 0) A numeric indicating the value for 'c' in the arcsinh data transformation
-#' equation. Should usually be 0.
-#' @param verbose A boolean specifying whether to display processing messages (default: TRUE)
+#' @param markerCommonField (default: "fixed") A character string indicating the
+#' name of a column containing common marker names for human use, like "CD45"
+#' @param markerFcsField (default: "desc") A character string indicating the
+#' name ofa column containing the marker names in the .fcs files,like "89Y_CD45"
+#' @param arcsinhA (default: 0) A numeric indicating the value for 'a' in the
+#' arcsinh data transformation equation. Should usually be 0.
+#' @param arcsinhB (default: 0.2) A numeric indicating the value for 'b' in the arcsinh
+#' data transformation equation. Should be 1/5 for cytof data, and 1/150 for flow data.
+#' @param arcsinhC (default: 0) A numeric indicating the value for 'c' in the
+#' arcsinh data transformation equation. Should usually be 0.
+#' @param verbose (default: TRUE) A boolean specifying whether to display processing messages
 #' @return An S3 object of class \code{discovrExperiment}
 #'
 #' @seealso \code{\link{discovrExperiment}}
@@ -50,15 +50,15 @@ setupDiscovrExperiment <- function(
   markerInfo <- read.csv(markerInfoFile, stringsAsFactors = FALSE)
   if(!all(c(markerCommonField, markerFcsField, "useToCluster") %in% names(markerInfo))){
     stop(
-      "The file set as 'markerInfoFile' must contain columns with names 'useToCluster' and the names
-      specified by commonMarkerField and fcsMarkerField. Please check your markerInfo file and try again."
+      "The file set as 'markerInfoFile' must contain columns with names 'useToCluster' and the names",
+      "specified by commonMarkerField and fcsMarkerField. Please check your markerInfo file and try again."
     )
   }
   if(!all(is.logical(markerInfo$useToCluster))){
     stop("The 'useToCluster' column in the 'markerInfo' file must contain only TRUE or FALSE values.")
   }
 
-  clusteringMarkers <- markerInfo[markerInfo$useToCluster, "commonMarkerName", drop = TRUE]
+  clusteringMarkers <- markerInfo[markerInfo$useToCluster, markerCommonField, drop = TRUE]
   if(verbose){message(paste("Found clustering markers:", paste(clusteringMarkers, collapse=", ")))}
 
   # get list of FCS files with subject and cell subset information, check for appropriate columns
@@ -126,7 +126,7 @@ setupDiscovrExperiment <- function(
   processData <- function(fcs){
     # Tidy marker names
     pData(parameters(fcs))$desc <-
-      markerInfo$commonMarkerName[match(pData(parameters(fcs))$desc, markerInfo$fcsMarkerName)]
+      markerInfo[[markerCommonField]][match(pData(parameters(fcs))$desc, markerInfo[[markerFcsField]])]
 
     # This changes parameters(fcs)$name, featureNames(fcs), and colnames(fcs) - aka events colnames - all in one fell swoop.
     # note colnames has to be the one from flowCore
@@ -197,120 +197,129 @@ setupDiscovrExperiment <- function(
 
   # building a discovr experiment S3 object
   exptInProgress <- structure(list(), class = "discovrExperiment")
-  exptInProgress$markerInfoFile <- markerInfoFile
-  exptInProgress$markerInfo     <- markerInfo
-  exptInProgress$fcsInfoFile    <- fcsInfoFile
-  exptInProgress$fcsInfo        <- fcsInfo
-  exptInProgress$mergedExpr     <- mergedExpr
+  exptInProgress$markerInfoFile     <- markerInfoFile
+  exptInProgress$markerInfo         <- markerInfo
+  exptInProgress$fcsInfoFile        <- fcsInfoFile
+  exptInProgress$fcsInfo            <- fcsInfo
+  exptInProgress$allDataTransformed <- allDataTransformed
+  exptInProgress$mergedExpr         <- mergedExpr
+  exptInProgress$clusteringMarkers  <- clusteringMarkers
   return(exptInProgress)
 }
 
-#' Load in a dataset and perform phenograph clustering
+#' Perform phenograph clustering for a DISCOV-R experiment
 #'
-#' @param markerInfoFile A character string indicating the path to a .csv file. This file is expected to have columns
-#' named useToCluster", as well as the names specified in the \code{markerCommonField} and \code{markerFcsField} variables.
-#' Details of the \code{markerCommonField} and \code{markerFcsField} arguments are provided below; the "useToCluster"
-#' column should have only TRUE or FALSE values. Markers with a TRUE value in this column will be used for clustering,
-#' whereas the others will not.
-#' @param fcsInfoFile A character string indicating the path to a file containing columns named "subject",
-#' "cellSubset", and "filename". The "filename" field must contain paths to the .fcs files that will be used in analysis.
-#' @param markerCommonField A character string indicating the name of a column containing common marker names for human use,
-#' like "CD45" (default: "fixed")
-#' @param markerFcsField A character string indicating the name of a column containing the marker names in the .fcs files,
-#' like "89Y_CD45" (default: "desc")
-#' @param arcsinhA (default: 0) A numeric indicating the value for 'a' in the arcsinh data transformation
-#' equation. Should usually be 0.
-#' @param arcsinhB (default: 0.2) A numeric indicating the value for 'b' in the arcsinh data transformation
-#' equation. Should be 1/5 for cytof data, and 1/150 for flow data.
-#' @param arcsinhC (default: 0) A numeric indicating the value for 'c' in the arcsinh data transformation
-#' equation. Should usually be 0.
+#' @param experiment A discovrExperiment created using \code{setupExperiment()}
+#' @param method A character string indicating the clustering method to use.
+#' Currently only 'phenograph' is supported as a clustering method.
 #' @param verbose A boolean specifying whether to display processing messages (default: TRUE)
 #' @return An S3 object of class \code{discovrExperiment}
 #'
+#' @seealso \code{\link{setupDiscovrExperiment}} \code{\link{setupDiscovrExperiment}}
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
-#' @import flowCore
 #' @import dplyr
-#' @importFrom methods as
-#' @importFrom stats setNames
-#' @importFrom utils read.csv
+#' @importFrom flowCore exprs
+#' @importFrom igraph graph.data.frame cluster_louvain membership modularity
 #' @export
-setupDiscovrExperiment <- function(
-  markerInfoFile,
-  fcsInfoFile,
-  markerCommonField = "fixed",
-  markerFcsField = "desc",
-  arcsinhA = 0,
-  arcsinhB = 0.2,
-  arcsinhC = 0,
+clusterDiscovrExperiment <- function(
+  experiment,
+  method = "phenograph",
   verbose = TRUE
 ){
-
-  ###################################################################
-  # 2.d.i: Phenograph clustering - takes a while
-  ###################################################################
+  #########################################################################
+  # Section 2.d.i from original SOP - Phenograph clustering - takes a while
+  #########################################################################
   # Clustering markers object is defined in the first set-up chunk.  Tweak which markers are included up there.
-#
-#   # Set up Phenograph function to use kd tree
-#   find_neighbors <- function(data, k){
-#     nearest <- RANN::nn2(data, data, k, treetype = "kd", searchtype = "standard")
-#     return(nearest[[1]])
-#   }
-#
-#   Rpheno <- function(data, k=30){
-#     if(is.data.frame(data))
-#       data <- as.matrix(data)
-#
-#     if(!is.matrix(data))
-#       stop("Wrong input data, should be a data frame or matrix!")
-#
-#     if(k<1){
-#       stop("k must be a positive integer!")
-#     }else if (k > nrow(data)-2){
-#       stop("k must be smaller than the total number of points!")
-#     }
-#
-#     message("Run Rphenograph starts:","\n",
-#       "  -Input data of ", nrow(data)," rows and ", ncol(data), " columns","\n",
-#       "  -k is set to ", k)
-#
-#     cat("  Finding nearest neighbors...")
-#     t1 <- system.time(neighborMatrix <- find_neighbors(data, k=k+1)[,-1])
-#     cat("DONE ~",t1[3],"s\n", " Compute jaccard coefficient between nearest-neighbor sets...")
-#     t2 <- system.time(links <- Rphenograph:::jaccard_coeff(neighborMatrix))
-#
-#     cat("DONE ~",t2[3],"s\n", " Build undirected graph from the weighted links...")
-#     links <- links[links[,1]>0, ]
-#     relations <- as.data.frame(links)
-#     colnames(relations)<- c("from","to","weight")
-#     t3 <- system.time(g <- igraph::graph.data.frame(relations, directed=FALSE))
-#
-#     cat("DONE ~",t3[3],"s\n", " Run louvain clustering on the graph ...")
-#     t4 <- system.time(community <- igraph::cluster_louvain(g))
-#     cat("DONE ~",t4[3],"s\n")
-#
-#     message("Run Rphenograph DONE, took a total of ", sum(c(t1[3],t2[3],t3[3],t4[3])), "s.")
-#     cat("  Return a community class\n  -Modularity value:", igraph::modularity(community),"\n")
-#     cat("  -Number of clusters:", length(unique(igraph::membership(community))))
-#
-#     return(community)
-#   }
-#
-#   # Run phenograph (using kd treetype) on each subject.
-#   PhenographClust = function(fcs, clusteringMarkers) {
-#     exprs_mat = as.matrix(as.data.frame(flowCore::exprs(fcs))[,clusteringMarkers])
-#     RPvect = as.numeric(igraph::membership(Rpheno(data = exprs_mat)))
-#     return(RPvect)
-#   }
-#   mergedExpr$RPclust = unlist(lapply(allDataTransformed, PhenographClust, clusteringMarkers))
-#
-#   # Get summary of the number of clusters generated for each subject
-#   n_pheno_clusts <- mergedExpr %>%
-#     group_by(samp) %>%
-#     summarize(k_clusters = max(RPclust))
-#   View(n_pheno_clusts)
-#
+
+  # Set up Phenograph function to use kd tree
+  findNeighbors <- function(data, k){
+    nearest <- RANN::nn2(data, data, k, treetype = "kd", searchtype = "standard")
+    return(nearest[[1]])
+  }
+
+  Rpheno <- function(data, k=30){
+    if(is.data.frame(data))
+      data <- as.matrix(data)
+
+    if(!is.matrix(data))
+      stop("Wrong input data, should be a data frame or matrix!")
+
+    if(k<1){
+      stop("k must be a positive integer!")
+    }else if (k > nrow(data)-2){
+      stop("k must be smaller than the total number of points!")
+    }
+
+    if(verbose){
+      message("Run Rphenograph starts:","\n",
+              "  -Input data of ", nrow(data)," rows and ", ncol(data), " columns","\n",
+              "  -k is set to ", k)
+      message("  Finding nearest neighbors...")
+    }
+
+    t1 <- system.time(neighborMatrix <- findNeighbors(data, k=k+1)[,-1])
+
+    if(verbose){
+      message(
+        "DONE ~",t1[3],"s\n",
+        "Compute jaccard coefficient between nearest-neighbor sets..."
+      )
+    }
+    t2 <- system.time(links <- jaccard_coeff(neighborMatrix))
+
+    if(verbose){
+      message(
+        "DONE ~",t2[3],"s\n",
+        "Build undirected graph from the weighted links..."
+      )
+    }
+
+    links <- links[links[,1]>0, ]
+    relations <- as.data.frame(links)
+    colnames(relations)<- c("from","to","weight")
+    t3 <- system.time(g <- igraph::graph.data.frame(relations, directed=FALSE))
+
+    if(verbose){
+      message(
+        "DONE ~",t3[3],"s\n",
+        "Run louvain clustering on the graph ..."
+      )
+    }
+
+    t4 <- system.time(community <- igraph::cluster_louvain(g))
+    if(verbose){
+      message("DONE ~",t4[3],"s\n")
+    }
+
+    if(verbose){
+      message("Run Rphenograph DONE, took a total of ", sum(c(t1[3],t2[3],t3[3],t4[3])), "s.")
+      message("  Return a community class\n  -Modularity value:", igraph::modularity(community),"\n")
+      message("  -Number of clusters:", length(unique(igraph::membership(community))))
+
+    }
+    return(community)
+  }
+
+  # Run phenograph (using kd treetype) on each subject.
+  PhenographClust = function(fcs, clusteringMarkers) {
+    exprsMat = as.matrix(as.data.frame(exprs(fcs))[,clusteringMarkers])
+    RPvect = as.numeric(igraph::membership(Rpheno(data = exprsMat)))
+    return(RPvect)
+  }
+
+  experiment$mergedExpr$RPclust = unlist(
+    lapply(
+      experiment$allDataTransformed,
+      PhenographClust,
+      experiment$clusteringMarkers
+    )
+  )
+
+  return(experiment)
+}
+
 #   ###################################################################
-#   # 2.e.i: Summarize and save outputs
+#   # Sections 2.e.i from original SOP - Summarize and save outputs
 #   ###################################################################
 #   # Calculate mean expression value of each marker for each phenograph cluster in each subject
 #   RP_mean <- mergedExpr %>%
