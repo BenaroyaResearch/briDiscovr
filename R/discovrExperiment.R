@@ -25,3 +25,27 @@
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}
 #' @export
 is.discovrExperiment <- function(x){ inherits(x, "discovrExperiment") }
+
+#' Print method for discovrExperiment objects
+#'
+#' Prints summary information about the experiment structure.
+#'
+#' @param x discovrExperiment object
+#' @param ... other arguments to be passed to generic print method
+#'
+#' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}
+#' @method print discovrExperiment
+#' @export
+print.discovrExperiment <- function(x, ...){
+  if(!is.discovrExperiment(x))
+    stop("The argument to print.discovrExperiment must be an object of type discovrExperiment")
+  cat(
+    sprintf(
+      "An object of class 'discovrExperiment'\nClustering markers: %s\n",
+      paste0(x$clusteringMarkers, collapse = ", ")
+    )
+  )
+  if(length(list(...)) > 0){
+    warning("Additional arguments were passed to print.discovrExperiment and were ignored.")
+  }
+}
