@@ -2,7 +2,7 @@
 % Please edit documentation in R/clusteringPhase.R
 \name{setupDiscovrExperiment}
 \alias{setupDiscovrExperiment}
-\title{Load in a dataset and perform phenograph clustering}
+\title{Prepare a dataset for DISCOV-R analysis}
 \usage{
 setupDiscovrExperiment(
   markerInfoFile,
@@ -25,28 +25,33 @@ whereas the others will not.}
 \item{fcsInfoFile}{A character string indicating the path to a file containing columns named "subject",
 "cellSubset", and "filename". The "filename" field must contain paths to the .fcs files that will be used in analysis.}
 
-\item{markerCommonField}{A character string indicating the name of a column containing common marker names for human use,
-like "CD45" (default: "fixed")}
+\item{markerCommonField}{(default: "fixed") A character string indicating the
+name of a column containing common marker names for human use, like "CD45"}
 
-\item{markerFcsField}{A character string indicating the name of a column containing the marker names in the .fcs files,
-like "89Y_CD45" (default: "desc")}
+\item{markerFcsField}{(default: "desc") A character string indicating the
+name ofa column containing the marker names in the .fcs files,like "89Y_CD45"}
 
-\item{arcsinhA}{(default: 0) A numeric indicating the value for 'a' in the arcsinh data transformation
-equation. Should usually be 0.}
+\item{arcsinhA}{(default: 0) A numeric indicating the value for 'a' in the
+arcsinh data transformation equation. Should usually be 0.}
 
-\item{arcsinhB}{(default: 0.2) A numeric indicating the value for 'b' in the arcsinh data transformation
-equation. Should be 1/5 for cytof data, and 1/150 for flow data.}
+\item{arcsinhB}{(default: 0.2) A numeric indicating the value for 'b' in the arcsinh
+data transformation equation. Should be 1/5 for cytof data, and 1/150 for flow data.}
 
-\item{arcsinhC}{(default: 0) A numeric indicating the value for 'c' in the arcsinh data transformation
-equation. Should usually be 0.}
+\item{arcsinhC}{(default: 0) A numeric indicating the value for 'c' in the
+arcsinh data transformation equation. Should usually be 0.}
 
-\item{verbose}{A boolean specifying whether to display processing messages (default: TRUE)}
+\item{verbose}{(default: TRUE) A boolean specifying whether to display processing messages}
 }
 \value{
 An S3 object of class \code{discovrExperiment}
 }
 \description{
-Load in a dataset and perform phenograph clustering
+Loads in the marker and .fcs information and prepares a \code{discovrExperiment}
+object for analysis. Default parameters values are based on the original DISCOV-R
+analysis published in Wiedeman et al 2020.
+}
+\seealso{
+\code{\link{discovrExperiment}}
 }
 \author{
 Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}, Virginia Muir
