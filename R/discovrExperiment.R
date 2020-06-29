@@ -41,8 +41,9 @@ print.discovrExperiment <- function(x, ...){
     stop("The argument to print.discovrExperiment must be an object of type discovrExperiment")
   cat(
     sprintf(
-      "An object of class 'discovrExperiment'\nClustering markers: %s\n",
-      paste0(x$clusteringMarkers, collapse = ", ")
+      "An object of class 'discovrExperiment'\nClustering markers: %s\nExperiment status: %s\n",
+      paste0(x$clusteringMarkers, collapse = ", "),
+      x$status
     )
   )
   if(length(list(...)) > 0){
