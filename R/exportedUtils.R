@@ -85,13 +85,14 @@ getFcsNEvents <- function(fcsFile) {
 #' Display the per-subject event counts in an experiment
 #'
 #' @param experiment A discovrExperiment created using \code{setupExperiment()}
+#' @return A data frame containing the number of events detected for each subject
 #'
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
 #' @importFrom magrittr %>%
 #' @importFrom dplyr group_by summarise n
 #' @importFrom utils View
 #' @export
-viewSubjectCounts <- function(experiment){
+getSubjectCounts <- function(experiment){
   if(!is.discovrExperiment(experiment)){
     stop(
       "The object passed to this function is not a valid DISCOV-R experiment object.",
@@ -111,18 +112,26 @@ viewSubjectCounts <- function(experiment){
     )
   }
   # Check for donors with too many/too few collected events
-  eventsByDonor = experiment$mergedExpr %>%
-  group_by(.data$samp) %>%
-  summarise(n_events = n(), .groups = "drop_last")
+  eventsByDonor <-
+    experiment$mergedExpr %>%
+    group_by(.data$samp) %>%
+    summarise(n_events = n(), .groups = "drop_last") %>%
+    as.data.frame()
 
-  tryCatch (
-    View(eventsByDonor),
-    error = function(e){print(eventsByDonor)},
-    warning = function(w){print(eventsByDonor)}
-  )
+  return(eventsByDonor)
 }
 
-viewSubjectClusters <- function(experiment){
+#' Display the per-subject number of clusters in an experiment
+#'
+#' @param experiment A discovrExperiment created using \code{setupExperiment()}
+#' @return A data frame containing the number of events detected for each subject
+#'
+#' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
+#' @importFrom magrittr %>%
+#' @importFrom dplyr group_by summarise n
+#' @importFrom utils View
+#' @export
+getSubjectClusters <- function(experiment){
   if(!is.discovrExperiment(experiment)){
     stop(
       "The object passed to this function is not a valid DISCOV-R experiment object.",
@@ -142,13 +151,10 @@ viewSubjectClusters <- function(experiment){
     )
   }
   # Get summary of the number of clusters generated for each subject
-  nPhenoClusts <- mergedExpr %>%
-    group_by(samp) %>%
-    summarize(k_clusters = max(experiment$mergedExpr$RPclust))
+  nPhenoClusts <- experiment$mergedExpr %>%
+    group_by(.data$samp) %>%
+    summarize(k_clusters = max(.data$RPclust)) %>%
+    as.data.frame()
 
-  tryCatch (
-    View(nPhenoClusts),
-    error = function(e){print(nPhenoClusts)},
-    warning = function(w){print(nPhenoClusts)}
-  )
+  return(nPhenoClusts)
 }
