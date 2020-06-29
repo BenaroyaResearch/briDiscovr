@@ -7,6 +7,7 @@
 setupDiscovrExperiment(
   markerInfoFile,
   fcsInfoFile,
+  parentPopulation,
   markerCommonField = "fixed",
   markerFcsField = "desc",
   arcsinhA = 0,
@@ -24,6 +25,9 @@ whereas the others will not.}
 
 \item{fcsInfoFile}{A character string indicating the path to a file containing columns named "subject",
 "cellSubset", and "filename". The "filename" field must contain paths to the .fcs files that will be used in analysis.}
+
+\item{parentPopulation}{A character sting indicating the name of the parent population subset. Must match
+one of the values in the fcsInfoFile 'cellSubset' column.}
 
 \item{markerCommonField}{(default: "fixed") A character string indicating the
 name of a column containing common marker names for human use, like "CD45"}

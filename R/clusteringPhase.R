@@ -15,6 +15,8 @@
 #' whereas the others will not.
 #' @param fcsInfoFile A character string indicating the path to a file containing columns named "subject",
 #' "cellSubset", and "filename". The "filename" field must contain paths to the .fcs files that will be used in analysis.
+#' @param parentPopulation A character sting indicating the name of the parent population subset. Must match
+#' one of the values in the fcsInfoFile 'cellSubset' column.
 #' @param markerCommonField (default: "fixed") A character string indicating the
 #' name of a column containing common marker names for human use, like "CD45"
 #' @param markerFcsField (default: "desc") A character string indicating the
@@ -39,6 +41,7 @@
 setupDiscovrExperiment <- function(
   markerInfoFile,
   fcsInfoFile,
+  parentPopulation,
   markerCommonField = "fixed",
   markerFcsField = "desc",
   arcsinhA = 0,
@@ -75,10 +78,19 @@ setupDiscovrExperiment <- function(
     }
   }
   if(length(filesThatDontExist > 0)){
-    stop(paste(
+    stop(
       "The following files could not be found:\n",
       paste0(filesThatDontExist, collapse = "\n")
-    ))
+    )
+  }
+
+  # check that the parent population is one of the subsets in the .fcs info
+  if(!parentPopulation %in% unique(fcsInfo$cellSubset)){
+    stop(
+      "The requested parent population '",
+      parentPopulation,
+      "'was not found in the 'cellSubset' column of the .fcs info file."
+    )
   }
 
   # Check fcs files for byte offset issue that will prevent analysis
@@ -124,6 +136,13 @@ setupDiscovrExperiment <- function(
 
   # Process data
   processData <- function(fcs){
+    # confirm that all markers to be used in clustering are mappable to fcs parameter names
+    clusteringMarkerDesc <- markerInfo[markerInfo$useToCluster, markerFcsField, drop = TRUE]
+    missingMarkers <- clusteringMarkerDesc[!clusteringMarkerDesc %in% pData(parameters(fcs))$desc]
+    if(length(missingMarkers) > 0){
+      stop("Could not find the following clustering markers in the .fcs data\n", paste0(missingMarkers, collapse = ", "))
+    }
+
     # Tidy marker names
     pData(parameters(fcs))$desc <-
       markerInfo[[markerCommonField]][match(pData(parameters(fcs))$desc, markerInfo[[markerFcsField]])]
@@ -204,6 +223,8 @@ setupDiscovrExperiment <- function(
   exptInProgress$allDataTransformed <- allDataTransformed
   exptInProgress$mergedExpr         <- mergedExpr
   exptInProgress$clusteringMarkers  <- clusteringMarkers
+  exptInProgress$status             <- "Initialized"
+
   return(exptInProgress)
 }
 
@@ -237,7 +258,7 @@ clusterDiscovrExperiment <- function(
     return(nearest[[1]])
   }
 
-  Rpheno <- function(data, k=30){
+  runRpheno <- function(data, k=30){
     if(is.data.frame(data))
       data <- as.matrix(data)
 
@@ -301,98 +322,96 @@ clusterDiscovrExperiment <- function(
   }
 
   # Run phenograph (using kd treetype) on each subject.
-  PhenographClust = function(fcs, clusteringMarkers) {
+  phenographClust = function(fcs, clusteringMarkers) {
     exprsMat = as.matrix(as.data.frame(exprs(fcs))[,clusteringMarkers])
-    RPvect = as.numeric(igraph::membership(Rpheno(data = exprsMat)))
-    return(RPvect)
+    rPhenoVect = as.numeric(igraph::membership(runRpheno(data = exprsMat)))
+    return(rPhenoVect)
   }
 
-  experiment$mergedExpr$RPclust = unlist(
-    lapply(
-      experiment$allDataTransformed,
-      PhenographClust,
-      experiment$clusteringMarkers
+  # Cluster data in experiment
+  if (method == "phenograph") {
+    experiment$mergedExpr$RPclust = unlist(
+      lapply(
+        experiment$allDataTransformed,
+        phenographClust,
+        experiment$clusteringMarkers
+      )
     )
-  )
+  } else {
+    stop("Clustering method '", method, "' is not currently supported. Stopping...")
+  }
+
+  ###################################################################
+  # Sections 2.e.i from original SOP - Summarize and save outputs
+  ###################################################################
+  # Calculate mean expression value of each marker for each phenograph cluster in each subject
+
+  ### TODO FROM HERE
+  clusterMeans <- experiment$mergedExpr %>%
+    dplyr::select(-cellSubset) %>%
+    group_by(samp, RPclust) %>%
+    summarise_all(mean) %>%
+    mutate(RPclust = as.character(RPclust))
+
+  # MGR - comments retained from original code. What is intent here?
+  ##################################
+  # Calculate total CD8 mean expression for each subject
+  ##NEED TO CHANGE -cell_subset to something else???
+  parentMeans = experiment$mergedExpr %>%
+    dplyr::select(-cellSubset, -RPclust) %>%
+    group_by(samp) %>%
+    summarise_all(mean) %>%
+    mutate(RPclust = "Total_Parent")
+
+  experiment$clusterMeans = bind_rows(clusterMeans, parentMeans)
+
+  # Count cells of each subpopulation (eg Tmr) in each phenograph cluster (from each sample)
+  clusterRarePopCts <-
+    experiment$mergedExpr %>%
+    dplyr::select(samp, cellSubset, RPclust) %>%
+    dplyr::group_by(samp, RPclust) %>%
+    dplyr::summarise(Total=n(), .groups = "drop_last") %>%
+    as.data.frame()
+
+  uniqueSubsets <- unique(experiment$mergedExpr$cellSubset)
+
+  for(currCellSubset in uniqueSubsets){
+    if(verbose){message("Counting cluster events for ", currCellSubset)}
+    additionalMatrix = experiment$mergedExpr %>%
+      dplyr::select(samp, cellSubset, RPclust) %>%
+      group_by(samp, RPclust) %>%
+      summarise(number = sum(cellSubset == currCellSubset)) %>%
+      as.data.frame()
+    clusterRarePopCts <- cbind(clusterRarePopCts, additionalMatrix$number)
+  }
+
+  for(i in 1:(ncol(clusterRarePopCts)-3)){
+    colnames(clusterRarePopCts)[i+3] = (uniqueSubsets)[i]
+  }
+
+  aggregateCounts = clusterRarePopCts %>%
+    dplyr::select(-RPclust) %>%
+    group_by(samp) %>%
+    summarise_all(sum) %>%
+    rename_at(vars(-samp),function(name) paste0(name,"_tot"))
+
+  clusterRarePopCts = left_join(clusterRarePopCts, aggregateCounts)
+
+  for(i in 1:(length(uniqueSubsets)+1)){
+    clusterRarePopCts <- cbind(
+      clusterRarePopCts,
+      clusterRarePopCts[,i+2]/clusterRarePopCts[,i+2+length(uniqueSubsets)+1]*100
+    )
+  }
+
+  for(i in 1:(length(uniqueSubsets))){
+    colnames(clusterRarePopCts)[i+3+(length(uniqueSubsets)+1)*2]= (paste0("pct_", (uniqueSubsets)[i], "_in_clust"))
+  }
+  colnames(clusterRarePopCts)[3+(length(uniqueSubsets)+1)*2]= "pct_Total_in_clust"
+
+  # update experiment data
+  experiment$status             <- paste("Clustered with", method)
+  experiment$clusterRarePopCts  <- clusterRarePopCts
 
   return(experiment)
 }
-
-#   ###################################################################
-#   # Sections 2.e.i from original SOP - Summarize and save outputs
-#   ###################################################################
-#   # Calculate mean expression value of each marker for each phenograph cluster in each subject
-#   RP_mean <- mergedExpr %>%
-#     dplyr::select(-cellSubset, -contains("tsne"), -contains("umap")) %>%
-#     group_by(samp, RPclust) %>%
-#     summarise_all(mean) %>%
-#     mutate(RPclust = as.character(RPclust))
-#
-#   # Calculate total CD8 mean expression for each subject  ##NEED TO CHANGE -cell_subset to somethinge else???
-#   CD8_mean = mergedExpr %>%
-#     dplyr::select(-cellSubset, -RPclust, -contains("tsne"), -contains("umap")) %>%
-#     group_by(samp) %>%
-#     summarise_all(mean) %>%
-#     mutate(RPclust = "Total_CD8")
-#
-#   RP_mean = bind_rows(RP_mean, CD8_mean)
-#
-#   # Count cells of each specificity in each phenograph cluster (from each sample)
-#
-#   RPtmr_counting = mergedExpr %>%
-#     dplyr::select(samp, cellSubset, RPclust) %>%
-#     group_by(samp, RPclust) %>%
-#     summarise(Total=n())
-#   RPtmr_counting=as.data.frame(RPtmr_counting)
-#
-#   uniqueCellSubsets=unique(mergedExpr$cellSubset)
-#
-#   for(currCellSubset in unique(mergedExpr$cellSubset)){
-#     additional_matrix = mergedExpr %>%
-#       dplyr::select(samp, cellSubset, RPclust) %>%
-#       group_by(samp, RPclust) %>%
-#       summarise(number = sum(cellSubset == currCellSubset))
-#     additional_matrix=as.data.frame(additional_matrix)
-#     print(cellSubset)
-#     RPtmr_counting<-cbind(RPtmr_counting, additional_matrix$number)
-#   }
-#
-#   for(i in 1:(ncol(RPtmr_counting)-3)){
-#     colnames(RPtmr_counting)[i+3]= (unique(mergedExpr$cellSubset))[i]
-#   }
-#
-#
-#   aggregate_counts = RPtmr_counting %>%
-#     dplyr::select(-RPclust) %>%
-#     group_by(samp) %>%
-#     summarise_all(sum) %>%
-#     rename_at(vars(-samp),function(name) paste0(name,"_tot"))
-#
-#   RPtmr_counting = RPtmr_counting %>%
-#     left_join(aggregate_counts)
-#
-#
-#   for(i in 1:(length(unique(mergedExpr$cellSubset))+1)){
-#     RPtmr_counting = cbind(RPtmr_counting,  RPtmr_counting[,i+2]/RPtmr_counting[,i+2+length(unique(mergedExpr$cellSubset))+1]*100)
-#   }
-#
-#   for(i in 1:(length(unique(mergedExpr$cellSubset)))){
-#     colnames(RPtmr_counting)[i+3+(length(unique(mergedExpr$cellSubset))+1)*2]= (paste0("pct_", (unique(mergedExpr$cellSubset))[i], "_in_clust"))
-#   }
-#
-#   colnames(RPtmr_counting)[3+(length(unique(mergedExpr$cellSubset))+1)*2]= "pct_Total_in_clust"
-#
-#   # Generate file structure in which to save R data and exports
-#   outputPathBase <- file.path(workingDir, "Output")
-#   dir.create(outputPathBase)
-#   dir.create(file.path(outputPathBase, format(Sys.Date(), "%y%m%d")))
-#   dir.create(file.path(outputPathBase, format(Sys.Date(), "%y%m%d"), "R_objects"))
-#
-#   fnamePrefixR <- file.path(outputPathBase, format(Sys.Date(), "%y%m%d"), "R_objects", format(Sys.Date(), "%y%m%d"))
-#
-#   # Save the clustering output
-#   pheno_filename = paste0(fnamePrefixR, "_all_phenograph_data.RData")
-#   save(mergedExpr, clusteringMarkers, RP_mean, RPtmr_counting,
-#     file = pheno_filename)
-#
-# }
