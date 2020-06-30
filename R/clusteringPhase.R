@@ -247,6 +247,13 @@ clusterDiscovrExperiment <- function(
   method = "phenograph",
   verbose = TRUE
 ){
+  if(!is.discovrExperiment(experiment)){
+    stop(
+      "The object passed to this function is not a valid DISCOV-R experiment object.",
+      "Please create your experiment using the 'setupExperiment' function and try again."
+    )
+  }
+
   #########################################################################
   # Section 2.d.i from original SOP - Phenograph clustering - takes a while
   #########################################################################
