@@ -61,7 +61,11 @@ setupDiscovrExperiment <- function(
     stop("The 'useToCluster' column in the 'markerInfo' file must contain only TRUE or FALSE values.")
   }
 
-  clusteringMarkers <- markerInfo[markerInfo$useToCluster, markerCommonField, drop = TRUE]
+  # set colnames of marker info data for consistency
+  markerInfo <- dplyr::rename(markerInfo, commonMarkerName = !!markerCommonField, fcsMarkerName = !!markerFcsField)
+
+  # extract clustering markers for convenience
+  clusteringMarkers <- markerInfo[markerInfo$useToCluster, "commonMarkerName", drop = TRUE]
   if(verbose){message(paste("Found clustering markers:", paste(clusteringMarkers, collapse=", ")))}
 
   # get list of FCS files with subject and cell subset information, check for appropriate columns
@@ -137,7 +141,7 @@ setupDiscovrExperiment <- function(
   # Process data
   processData <- function(fcs){
     # confirm that all markers to be used in clustering are mappable to fcs parameter names
-    clusteringMarkerDesc <- markerInfo[markerInfo$useToCluster, markerFcsField, drop = TRUE]
+    clusteringMarkerDesc <- markerInfo[markerInfo$useToCluster, "fcsMarkerName", drop = TRUE]
     missingMarkers <- clusteringMarkerDesc[!clusteringMarkerDesc %in% pData(parameters(fcs))$desc]
     if(length(missingMarkers) > 0){
       stop("Could not find the following clustering markers in the .fcs data\n", paste0(missingMarkers, collapse = ", "))
@@ -145,7 +149,7 @@ setupDiscovrExperiment <- function(
 
     # Tidy marker names
     pData(parameters(fcs))$desc <-
-      markerInfo[[markerCommonField]][match(pData(parameters(fcs))$desc, markerInfo[[markerFcsField]])]
+      markerInfo$commonMarkerName[match(pData(parameters(fcs))$desc, markerInfo$fcsMarkerName)]
 
     # This changes parameters(fcs)$name, featureNames(fcs), and colnames(fcs) - aka events colnames - all in one fell swoop.
     # note colnames has to be the one from flowCore
