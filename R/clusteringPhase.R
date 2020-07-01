@@ -53,7 +53,7 @@ setupDiscovrExperiment <- function(
   markerInfo <- read.csv(markerInfoFile, stringsAsFactors = FALSE)
   if(!all(c(markerCommonField, markerFcsField, "useToCluster") %in% names(markerInfo))){
     stop(
-      "The file set as 'markerInfoFile' must contain columns with names 'useToCluster' and the names",
+      "The file set as 'markerInfoFile' must contain columns with names 'useToCluster' and the names ",
       "specified by commonMarkerField and fcsMarkerField. Please check your markerInfo file and try again."
     )
   }
@@ -89,7 +89,7 @@ setupDiscovrExperiment <- function(
     stop(
       "The requested parent population '",
       parentPopulation,
-      "'was not found in the 'cellSubset' column of the .fcs info file."
+      "' was not found in the 'cellSubset' column of the .fcs info file."
     )
   }
 
@@ -223,20 +223,20 @@ setupDiscovrExperiment <- function(
   exptInProgress$allDataTransformed <- allDataTransformed
   exptInProgress$mergedExpr         <- mergedExpr
   exptInProgress$clusteringMarkers  <- clusteringMarkers
-  exptInProgress$status             <- "Initialized"
+  exptInProgress$status             <- "initialized"
 
   return(exptInProgress)
 }
 
 #' Perform phenograph clustering for a DISCOV-R experiment
 #'
-#' @param experiment A discovrExperiment created using \code{setupExperiment()}
+#' @param experiment A discovrExperiment created using \code{setupDiscovrExperiment()}
 #' @param method A character string indicating the clustering method to use.
 #' Currently only 'phenograph' is supported as a clustering method.
 #' @param verbose A boolean specifying whether to display processing messages (default: TRUE)
 #' @return An S3 object of class \code{discovrExperiment}
 #'
-#' @seealso \code{\link{setupDiscovrExperiment}} \code{\link{setupDiscovrExperiment}}
+#' @seealso \code{\link{setupDiscovrExperiment}} \code{\link{discovrExperiment}}
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
 #' @import dplyr
 #' @importFrom flowCore exprs
@@ -250,7 +250,7 @@ clusterDiscovrExperiment <- function(
   if(!is.discovrExperiment(experiment)){
     stop(
       "The object passed to this function is not a valid DISCOV-R experiment object.",
-      "Please create your experiment using the 'setupExperiment' function and try again."
+      "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
     )
   }
 
@@ -417,7 +417,8 @@ clusterDiscovrExperiment <- function(
   colnames(clusterRarePopCts)[3+(length(uniqueSubsets)+1)*2]= "pct_Total_in_clust"
 
   # update experiment data
-  experiment$status             <- paste("Clustered with", method)
+  experiment$status             <- "clustered"
+  experiment$clusterMethod      <- method
   experiment$clusterRarePopCts  <- clusterRarePopCts
 
   return(experiment)

@@ -84,7 +84,7 @@ getFcsNEvents <- function(fcsFile) {
 
 #' Display the per-subject event counts in an experiment
 #'
-#' @param experiment A discovrExperiment created using \code{setupExperiment()}
+#' @param experiment A discovrExperiment created using \code{setupDiscovrExperiment()}
 #' @return A data frame containing the number of events detected for each subject
 #'
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
@@ -96,19 +96,19 @@ getSubjectCounts <- function(experiment){
   if(!is.discovrExperiment(experiment)){
     stop(
       "The object passed to this function is not a valid DISCOV-R experiment object.",
-      "Please create your experiment using the 'setupExperiment' function and try again."
+      "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
     )
   }
   if (!'mergedExpr' %in% names(experiment)){
     stop(
       "The data passed to this function appears incorrectly formatted.",
-      "Please create your experiment using the 'setupExperiment' function and try again."
+      "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
     )
   }
   if (!'samp' %in% names(experiment$mergedExpr)){
     stop(
       "The data passed to this function appears incorrectly formatted.",
-      "Please create your experiment using the 'setupExperiment' function and try again."
+      "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
     )
   }
   # Check for donors with too many/too few collected events
@@ -123,7 +123,7 @@ getSubjectCounts <- function(experiment){
 
 #' Display the per-subject number of clusters in an experiment
 #'
-#' @param experiment A discovrExperiment created using \code{setupExperiment()}
+#' @param experiment A discovrExperiment created using \code{setupDiscovrExperiment()}
 #' @return A data frame containing the number of events detected for each subject
 #'
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
@@ -135,13 +135,13 @@ getSubjectClusters <- function(experiment){
   if(!is.discovrExperiment(experiment)){
     stop(
       "The object passed to this function is not a valid DISCOV-R experiment object.",
-      "Please create your experiment using the 'setupExperiment' function and try again."
+      "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
     )
   }
   if (!'mergedExpr' %in% names(experiment)){
     stop(
       "The data passed to this function appears incorrectly formatted.",
-      "Please create your experiment using the 'setupExperiment' function and try again."
+      "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
     )
   }
   if (!'RPclust' %in% names(experiment$mergedExpr)){
