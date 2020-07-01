@@ -38,7 +38,7 @@ is.discovrExperiment <- function(x){ inherits(x, "discovrExperiment") }
 #' @export
 print.discovrExperiment <- function(x, ...){
   if(!is.discovrExperiment(x))
-    stop("The argument to print.discovrExperiment must be an object of type discovrExperiment")
+    stop("The argument to print.discovrExperiment must be an object of type 'discovrExperiment'.")
   cat(
     sprintf(
       "An object of class 'discovrExperiment'\nClustering markers: %s\nExperiment status: %s\n",
@@ -49,4 +49,16 @@ print.discovrExperiment <- function(x, ...){
   if(length(list(...)) > 0){
     warning("Additional arguments were passed to print.discovrExperiment and were ignored.")
   }
+}
+
+#' Get all sample IDs in an experiment
+#'
+#' @param x discovrExperiment object
+#'
+#' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}
+#' @export
+getSampleNames <- function(x){
+  if(!is.discovrExperiment(x))
+    stop("The argument to 'getSampleNames' must be an object of type 'discovrExperiment'.")
+  return(unique(x$mergedExpr$samp))
 }
