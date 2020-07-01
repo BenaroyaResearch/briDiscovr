@@ -26,4 +26,5 @@ Imports:
     readr,
     flowCore,
     magrittr,
-    stringr
+    stringr,
+    reshape2
