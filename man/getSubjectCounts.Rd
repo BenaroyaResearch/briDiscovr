@@ -7,7 +7,7 @@
 getSubjectCounts(experiment)
 }
 \arguments{
-\item{experiment}{A discovrExperiment created using \code{setupExperiment()}}
+\item{experiment}{A discovrExperiment created using \code{setupDiscovrExperiment()}}
 }
 \value{
 A data frame containing the number of events detected for each subject

@@ -7,7 +7,7 @@
 clusterDiscovrExperiment(experiment, method = "phenograph", verbose = TRUE)
 }
 \arguments{
-\item{experiment}{A discovrExperiment created using \code{setupExperiment()}}
+\item{experiment}{A discovrExperiment created using \code{setupDiscovrExperiment()}}
 
 \item{method}{A character string indicating the clustering method to use.
 Currently only 'phenograph' is supported as a clustering method.}
@@ -21,7 +21,7 @@ An S3 object of class \code{discovrExperiment}
 Perform phenograph clustering for a DISCOV-R experiment
 }
 \seealso{
-\code{\link{setupDiscovrExperiment}} \code{\link{setupDiscovrExperiment}}
+\code{\link{setupDiscovrExperiment}} \code{\link{discovrExperiment}}
 }
 \author{
 Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}, Virginia Muir
