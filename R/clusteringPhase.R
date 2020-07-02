@@ -360,9 +360,9 @@ clusterDiscovrExperiment <- function(
   ### TODO FROM HERE
   clusterMeans <- experiment$mergedExpr %>%
     dplyr::select(-cellSubset) %>%
-    group_by(samp, RPclust) %>%
-    summarise_all(mean) %>%
-    mutate(RPclust = as.character(RPclust))
+    dplyr::group_by(samp, RPclust) %>%
+    dplyr::summarise_all(mean) %>%
+    dplyr::mutate(RPclust = as.character(RPclust))
 
   # MGR - comments retained from original code. What is intent here?
   ##################################
@@ -370,11 +370,11 @@ clusterDiscovrExperiment <- function(
   ##NEED TO CHANGE -cell_subset to something else???
   parentMeans = experiment$mergedExpr %>%
     dplyr::select(-cellSubset, -RPclust) %>%
-    group_by(samp) %>%
-    summarise_all(mean) %>%
-    mutate(RPclust = "Total_Parent")
+    dplyr::group_by(samp) %>%
+    dplyr::summarise_all(mean) %>%
+    dplyr::mutate(RPclust = "Total_Parent")
 
-  experiment$clusterMeans = bind_rows(clusterMeans, parentMeans)
+  experiment$clusterMeans <- bind_rows(clusterMeans, parentMeans)
 
   # Count cells of each subpopulation (eg Tmr) in each phenograph cluster (from each sample)
   clusterRarePopCts <-
