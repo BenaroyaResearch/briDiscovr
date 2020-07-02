@@ -1,3 +1,6 @@
+## Copyright (C) 2020  Mario Rosasco and Benaroya Research Institute
+##
+## This file is part of the briDiscovr package
 
 #' Perform metaclustering for a DISCOV-R experiment
 #'
@@ -13,10 +16,14 @@
 #' @param pctInClusterThreshold A numeric indicating a percentage. Cluster with event
 #' occupancy below this threshold will be considered 'low-abundance' and will be
 #' dropped from further analysis (default: 1)
+#' @param nMetaclusters A numeric indicating the number of metaclusters to generate (default: 12)
+#' @param linkage A string indicating the cluster linkage method to use when metaclustering.
+#' See \code{hclust} for more details. (default: "ward.D2")
+#' @param distance A string indicating the distance metric to use when metaclustering. (default: "euclidean")
 #' @param verbose A boolean specifying whether to display processing messages (default: TRUE)
 #' @return An S3 object of class \code{discovrExperiment}
 #'
-#' @seealso \code{\link{setupDiscovrExperiment}} \code{\link{setupDiscovrExperiment}}
+#' @seealso \code{\link{setupDiscovrExperiment}} \code{\link{clusterDiscovrExperiment}}
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
 #' @import dplyr
 #' @importFrom flowCore exprs
@@ -27,6 +34,9 @@ metaclusterDiscovrExperiment <- function(
   dropSamples = NA,
   dropMarkers = NA,
   pctInClusterThreshold = 1,
+  nMetaclusters = 12,
+  linkage = "ward.D2",
+  distance = "euclidean",
   verbose = TRUE
 ){
   if(!is.discovrExperiment(experiment)){
@@ -190,6 +200,21 @@ metaclusterDiscovrExperiment <- function(
     magrittr::set_rownames(.$marker) %>%
     dplyr::select(-marker)
 
+  # use ComplexHeatmap as a convenient way of applying metaclustering
+  metaxHeatmap <- ComplexHeatmap::Heatmap(
+    allSubsetAllSubjectZscores,
+    clustering_method_columns = linkage,
+    clustering_distance_rows = distance,
+    clustering_method_rows = linkage,
+    clustering_distance_rows = distance
+  )
+
+  # cut the heatmap dendrogram to get phenotypic metaclusters
+  colIndices <- stats::cutree(
+    as.hclust(ComplexHeatmap::column_dend(metaxHeatmap)),
+    k = nMetaclusters
+  )
+
   ####################################################
   # attach data and return metaclustered experiment
   ####################################################
@@ -200,7 +225,74 @@ metaclusterDiscovrExperiment <- function(
   experiment$allSubsetAllSubjectZscores   <- allSubsetAllSubjectZscores
   experiment$allSubsetAllSubjectArcsinh   <- allSubsetAllSubjectArcsinh
   experiment$subsetEventCounting          <- subsetEventCounting
+  experiment$nMetaclusters                <- nMetaclusters
+  experiment$colIndices                   <- colIndices
+  experiment$linkage                      <- linkage
+  experiment$distance                     <- distance
   experiment$status                       <- "metaclustered"
 
+  return(experiment)
+}
+
+
+#' Re-cut a metaclustered experiment with a different target number of metaclusters
+#'
+#' @param experiment A discovrExperiment created using \code{setupDiscovrExperiment},
+#' clustered using \code{clusterDiscovrExperiment}, and metaclustered using
+#' \code{metaclusterDiscovrExperiment}
+#' @param nMetaclusters A numeric indicating the number of metaclusters to generate (default: 12)
+#' @param linkage A string indicating the cluster linkage method to use when metaclustering.
+#' See \code{hclust} for more details. (default: "ward.D2")
+#' @param distance A string indicating the distance metric to use when metaclustering. (default: "euclidean")
+#' @param verbose A boolean specifying whether to display processing messages (default: TRUE)
+#' @return An S3 object of class \code{discovrExperiment}
+#'
+#' @seealso \code{\link{metaclusterDiscovrExperiment}}
+#' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
+#' @import dplyr
+#' @importFrom flowCore exprs
+#' @importFrom igraph graph.data.frame cluster_louvain membership modularity
+#' @export
+recutMetaclusters <- function(
+  experiment,
+  nMetaclusters = 12,
+  linkage = "ward.D2",
+  distance = "euclidean",
+  verbose = TRUE
+){
+  if(!is.discovrExperiment(experiment)){
+    stop(
+      "The object passed to this function is not a valid DISCOV-R experiment object. ",
+      "Please create your experiment using the 'setupDiscovrExperiment' function ",
+      "and perform the initial clustering using the 'clusterDiscovrExperiment' function. "
+    )
+  }
+  if(experiment$status != "metaclustered"){
+    stop(
+      "The experiment must have already been metaclustered in order to be re-cut using this function.. ",
+      "The current experiment has a status of ", experiment$status, ". ",
+      "Please use the function 'metaclusterDiscovrExperiment' if performing metaclustering for the first time."
+    )
+  }
+
+  # use ComplexHeatmap as a convenient way of applying metaclustering
+  metaxHeatmap <- ComplexHeatmap::Heatmap(
+    allSubsetAllSubjectZscores,
+    clustering_method_columns = linkage,
+    clustering_distance_rows = distance,
+    clustering_method_rows = linkage,
+    clustering_distance_rows = distance
+  )
+
+  # cut the heatmap dendrogram to get phenotypic metaclusters
+  colIndices <- stats::cutree(
+    as.hclust(ComplexHeatmap::column_dend(metaxHeatmap)),
+    k = nMetaclusters
+  )
+
+  experiment$nMetaclusters                <- nMetaclusters
+  experiment$colIndices                   <- colIndices
+  experiment$linkage                      <- linkage
+  experiment$distance                     <- distance
   return(experiment)
 }
