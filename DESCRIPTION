@@ -25,6 +25,7 @@ Imports:
     dplyr,
     readr,
     flowCore,
+    ComplexHeatmap,
     magrittr,
     stringr,
     reshape2

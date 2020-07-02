@@ -11,6 +11,7 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
     
 BiocManager::install("flowCore")
+BiocManager::install("ComplexHeatmap")
 BiocManager::install("Rtsne")
 BiocManager::install("umap")
 ```
