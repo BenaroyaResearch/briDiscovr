@@ -41,7 +41,8 @@ print.discovrExperiment <- function(x, ...){
     stop("The argument to print.discovrExperiment must be an object of type 'discovrExperiment'.")
   cat(
     sprintf(
-      "An object of class 'discovrExperiment'\nClustering markers: %s\nExperiment status: %s\n",
+      "An object of class 'discovrExperiment'\nAll markers: %s\nClustering markers: %s\nExperiment status: %s\n",
+      paste0(x$markerInfo$commonMarkerName, collapse = ", "),
       paste0(x$clusteringMarkers, collapse = ", "),
       x$status
     )
