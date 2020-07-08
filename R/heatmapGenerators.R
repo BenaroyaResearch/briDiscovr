@@ -23,7 +23,11 @@
 #' @seealso \code{\link{setupDiscovrExperiment}} \code{\link{clusterDiscovrExperiment}} \code{\link{metaclusterDiscovrExperiment}}
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
 #' @import dplyr
-#' @importFrom flowCore exprs
+#' @importFrom tibble rownames_to_column
+#' @importFrom stringr str_remove
+#' @importFrom rlang .data
+#' @importFrom grDevices colorRampPalette dev.off png
+#' @importFrom grid unit
 #' @importFrom RColorBrewer brewer.pal
 #' @importFrom circlize colorRamp2
 #' @export
@@ -111,17 +115,10 @@ makeMetaclusterHeatmaps <- function(
   # get subject ids, assign colors to them
   subject_ids <- sort(unique(experiment$clusterRarePopCts$samp))
   subject_id_colors <- data.frame(subject = subject_ids,
-                                  #color = rainbow(length(subject_ids)))
                                   color = c("#000000FF",
                                             viridisLite::plasma(length(subject_ids)+2)[4:(length(subject_ids)+2)]))
 
-  # pass_threshold_colors <- data.frame(pass = c(T,F), color = c("#FF0000", "#888888"))
-  # pass_threshold_colors <- data.frame(pass = c("no", "yes", "enriched"), color = c("#888888", "#FF0000", "#0000FF"))
-  # pass_threshold_colors <- data.frame(pass = c(0:8), color = c("#FFFFFF", "#3F054E", "#409E9B", "#CC0101", "#3F054E", "#409E9B", "#CC0101", "#5DC762", "#FFFFFF"))
-  #
-  # duration_colors <- data.frame(status = c("LS", "RO"), color = c("#2D297A", "#BB9C3E"))
-  # progression_colors <- data.frame(status = c("Pre-slow", "Slow", "Unclassified", "Rapid", "Post-rapid"),
-  #                                  color = c("#184349", "#368BA1", "#D3D3D3", "#5E9130", "#21632E"))
+
 
   #########################################################################
   # Section 3.d from original SOP - create heatmaps
@@ -129,15 +126,15 @@ makeMetaclusterHeatmaps <- function(
 
   allSubsetZscoreAnnoDf <-
     experiment$hmapDfAllSubsets %>%
-    dplyr::select(sample, !!subsets) %>%
+    dplyr::select(.data$sample, !!subsets) %>%
     unique %>%
-    dplyr::slice(match(colnames(experiment$allSubsetAllSubjectZscores), .$sample)) %>%
+    dplyr::slice(match(colnames(experiment$allSubsetAllSubjectZscores), .data$sample)) %>%
     dplyr::left_join(
       data.frame(group = experiment$colIndices) %>% rownames_to_column("sample"),
       by = "sample"
     ) %>%
-    dplyr::mutate(subject = str_replace(.$sample, "_[0-9]+$", "")) %>%
-    dplyr::select(subject, group, !!childSubsets)
+    dplyr::mutate(subject = str_replace(.data$sample, "_[0-9]+$", "")) %>%
+    dplyr::select(.data$subject, .data$group, !!childSubsets)
 
 
   # TODO: add an argument to facilitate more annotations
@@ -216,10 +213,9 @@ makeMetaclusterHeatmaps <- function(
   print(zscore_hmap)
   dev.off()
 
-  marker_order = ComplexHeatmap::row_order(zscore_hmap)#[[1]]
+  marker_order = ComplexHeatmap::row_order(zscore_hmap)
 
-
-  #MFI plot did not work
+  #MFI plot
   png(
     filename = paste0(
       filenamePrefix, "_", experiment$linkage, "_", experiment$distance, "_",
@@ -249,45 +245,49 @@ makeMetaclusterHeatmaps <- function(
 
 
   # Weighted Average phenotype hmap - average of arcsinch values in each metacluster
-  per_metax_avg <-
+  perMetaclusterAvg <-
     data.frame(t(experiment$allSubsetAllSubjectArcsinh)) %>%
-    dplyr::mutate(sample = rownames(.)) %>%
+    tibble::rownames_to_column("sample") %>%
     merge(subsetEventCounting, by = "sample") %>%
     dplyr::rowwise() %>%
     mutate(
       n_event = sum(c_across(subsets)),
-      subj = str_remove(sample, "_.*"),
-      RP_clust = str_remove(sample, ".*_")
+      subj = stringr::str_remove(.data$sample, "_.*"),
+      RP_clust = stringr::str_remove(.data$sample, ".*_")
     ) %>%
     dplyr::ungroup() %>%
-    dplyr::group_by(subj) %>%
-    dplyr::mutate(subj_event = sum(n_event)) %>%
+    dplyr::group_by(.data$subj) %>%
+    dplyr::mutate(subj_event = sum(.data$n_event)) %>%
     dplyr::ungroup() %>%
-    dplyr::mutate(proportion = n_event/subj_event) %>%
-    dplyr::mutate_at(experiment$metaclusterMarkers, funs(.*proportion)) %>%
-    dplyr::select(-sample, -!!subsets, -n_event, -subj, -RP_clust, -subj_event) %>%
-    dplyr::group_by(group) %>%
+    dplyr::mutate(proportion = .data$n_event/.data$subj_event) %>%
+    dplyr::mutate_at(experiment$metaclusterMarkers, funs(.*.data$proportion)) %>%
+    dplyr::select(
+      -.data$sample,
+      -!!subsets,
+      -.data$n_event,
+      -.data$subj,
+      -.data$RP_clust,
+      -.data$subj_event) %>%
+    dplyr::group_by(.data$group) %>%
     dplyr::summarise_all(sum) %>%
-    dplyr::mutate_at(experiment$metaclusterMarkers, funs(./proportion)) %>%
-    dplyr::select(-group, -proportion) %>%
+    dplyr::mutate_at(experiment$metaclusterMarkers, funs(./.data$proportion)) %>%
+    dplyr::select(-.data$group, -.data$proportion) %>%
     t
 
-  colnames(per_metax_avg) = 1:experiment$nMetaclusters
+  colnames(perMetaclusterAvg) = 1:experiment$nMetaclusters
 
   # set up data frame for annotation bar for average hmap
   tmr_avg_anno_df <-
-    data.frame(group = colnames(per_metax_avg))
+    data.frame(group = colnames(perMetaclusterAvg))
 
   # set up colors as a named list
   tmr_avg_anno_colors <- list(
     #1-12MCs
     group = setNames(
       RColorBrewer::brewer.pal(experiment$kGroups, "Set3"),
-      as.character(colnames(per_metax_avg))
+      as.character(colnames(perMetaclusterAvg))
     )
   )
-  #group = setNames(c(brewer.pal(12, "Set3"), brewer.pal(kGroups-12, "Set2")),        #12-20MCs
-  #               as.character(colnames(per_metax_avg))))
 
   tmr_avg_anno <- ComplexHeatmap::HeatmapAnnotation(df = tmr_avg_anno_df,
                                     col = tmr_avg_anno_colors,
@@ -297,7 +297,7 @@ makeMetaclusterHeatmaps <- function(
 
   #Did not work Error in .local(object, ...) : Number of rows in the matrix are not the same as the length of the cluster or the row orders.
   tmr_hm <- ComplexHeatmap::Heatmap(
-    per_metax_avg,
+    perMetaclusterAvg,
     col = my_arcsinh_pal,
     name = "MFI",
     column_title = paste0("Clusters Enriched for ", experiment$nMetaclusters, " Tmrs"),
@@ -331,24 +331,31 @@ makeMetaclusterHeatmaps <- function(
   # equivalent contributions from subjects with disparate numbers of collected events
   parentPopulationAvg <-
     data.frame(t(experiment$allSubsetAllSubjectArcsinh)) %>%
-    dplyr::mutate(sample = rownames(.)) %>%
+    tibble::rownames_to_column("sample") %>%
     merge(experiment$subsetEventCounting, by = "sample") %>%
     dplyr::rowwise() %>%
     dplyr::mutate(
       n_event = sum(c_across(subsets)),
-      subj = str_remove(sample, "_.*"),
-      RP_clust = str_remove(sample, ".*_")
+      subj = stringr::str_remove(.data$sample, "_.*"),
+      RP_clust = stringr::str_remove(.data$sample, ".*_")
     ) %>%
     dplyr::ungroup() %>%
-    dplyr::group_by(subj) %>%
-    dplyr::mutate(subj_event = sum(n_event)) %>%
+    dplyr::group_by(.data$subj) %>%
+    dplyr::mutate(subj_event = sum(.data$n_event)) %>%
     dplyr::ungroup() %>%
-    dplyr::mutate(proportion = n_event/subj_event) %>%
-    dplyr::mutate_at(experiment$metaclusterMarkers, funs(.*proportion)) %>%
-    dplyr::select(-sample, -!!subsets, -n_event, -subj, -RP_clust, -subj_event) %>%
+    dplyr::mutate(proportion = .data$n_event/.data$subj_event) %>%
+    dplyr::mutate_at(experiment$metaclusterMarkers, funs(.*.data$proportion)) %>%
+    dplyr::select(
+      -.data$sample,
+      -!!subsets,
+      -.data$n_event,
+      -.data$subj,
+      -.data$RP_clust,
+      -.data$subj_event
+    ) %>%
     dplyr::summarise_all(sum) %>%
-    dplyr::mutate_at(experiment$metaclusterMarkers, funs(./proportion)) %>%
-    dplyr::select(-proportion) %>%
+    dplyr::mutate_at(experiment$metaclusterMarkers, funs(./.data$proportion)) %>%
+    dplyr::select(-.data$proportion) %>%
     t
 
   colnames(parentPopulationAvg) = parentTitle

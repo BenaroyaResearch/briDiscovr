@@ -88,6 +88,7 @@ getFcsNEvents <- function(fcsFile) {
 #' @return A data frame containing the number of events detected for each subject
 #'
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
+#' @importFrom rlang .data
 #' @importFrom magrittr %>%
 #' @importFrom dplyr group_by summarise n rename
 #' @importFrom utils View
@@ -114,7 +115,7 @@ getSubjectCounts <- function(experiment){
   # Check for donors with too many/too few collected events
   eventsByDonor <-
     experiment$mergedExpr %>%
-    rename(sample = samp) %>%
+    rename(sample = .data$samp) %>%
     group_by(.data$sample) %>%
     summarise(nEvents = n(), .groups = "drop_last") %>%
     as.data.frame()
@@ -128,6 +129,7 @@ getSubjectCounts <- function(experiment){
 #' @return A data frame containing the number of events detected for each subject
 #'
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
+#' @importFrom rlang .data
 #' @importFrom magrittr %>%
 #' @importFrom dplyr group_by summarise n
 #' @importFrom utils View
@@ -153,7 +155,7 @@ getSubjectClusters <- function(experiment){
   }
   # Get summary of the number of clusters generated for each subject
   nPhenoClusts <- experiment$mergedExpr %>%
-    rename(sample = samp) %>%
+    rename(sample = .data$samp) %>%
     group_by(.data$sample) %>%
     summarize(kClusters = max(.data$RPclust)) %>%
     as.data.frame()

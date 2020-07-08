@@ -134,9 +134,9 @@ setupDiscovrExperiment <- function(
   # Read in FCS files and associate with cell subsets and subjects
   for (currCellSubset in unique(fcsInfo$cellSubset)){
     if(verbose){message(paste0("Assigning per-subject data for subset: ", currCellSubset, "..."))}
-    assign(currCellSubset, buildFcsList(fcsInfo %>% dplyr::filter(cellSubset == currCellSubset), truncate_max_range = FALSE))
+    assign(currCellSubset, buildFcsList(fcsInfo %>% dplyr::filter(.data$cellSubset == currCellSubset), truncate_max_range = FALSE))
   }
-  assign("All_Subjects", buildFcsList(fcsInfo[!duplicated(fcsInfo$subject),], truncate_max_range = FALSE))
+  assign("allSubjects", buildFcsList(fcsInfo[!duplicated(fcsInfo$subject),], truncate_max_range = FALSE))
 
   # Process data
   processData <- function(fcs){
@@ -167,11 +167,11 @@ setupDiscovrExperiment <- function(
     tmpFile <- lapply(tmpFile, processData)
     assign(currCellSubset, tmpFile)
   }
-  All_Subjects <- lapply(All_Subjects, processData)
+  allSubjects <- lapply(allSubjects, processData)
 
   if(verbose){message("Merging data (parent and child populations)...")}
-  allMerged = All_Subjects
-  for(currSubject in names(All_Subjects)){
+  allMerged = allSubjects
+  for(currSubject in names(allSubjects)){
     exprs(allMerged[[currSubject]]) = exprs(allMerged[[currSubject]])[0,]
     for(cellSubset in unique(fcsInfo$cellSubset)){
       exprs(allMerged[[currSubject]]) = rbind(
@@ -186,14 +186,14 @@ setupDiscovrExperiment <- function(
     # Arcsinh transform remaining columns
     tl <- transformList(
       flowCore::colnames(fcs),
-      arcsinhTransform(a=arcsinhA, b=arcsinhB, c=arcsinhC),
+      arcsinhTransform(a = arcsinhA, b = arcsinhB, c = arcsinhC),
       transformationId="asinh"
     )
     fcs = transform(fcs, tl)
   }
 
   if(verbose){
-    message(paste0("Transforming data using arcsinh(a=", arcsinhA, ", b=", arcsinhB, ", c=", arcsinhC, ")..."))
+    message("Transforming data using arcsinh(a=", arcsinhA, ", b=", arcsinhB, ", c=", arcsinhC, ")...")
   }
   allDataTransformed <- lapply(allMerged, asinhTfmData)
   transformedFlowSet <- as(allDataTransformed, "flowSet")
@@ -204,14 +204,16 @@ setupDiscovrExperiment <- function(
     c(flowCore::colnames(transformedFlowSet), "samp", "cellSubset")
   )
 
-  for(currSubject in names(All_Subjects)){
+  for(currSubject in names(allSubjects)){
     tmpExpr = as.data.frame(flowCore::exprs(transformedFlowSet[[currSubject]]))
     tmpExpr$samp = as.character(currSubject)
     temp_cellSubsets <- list()
     for(cellSubset in unique(fcsInfo$cellSubset)){
       temp_cellSubsets <- c(
         temp_cellSubsets,
-        if(!is.null(get(cellSubset)[[currSubject]])) rep(paste0(cellSubset), nrow(flowCore::exprs(get(cellSubset)[[currSubject]])))
+        if(!is.null(get(cellSubset)[[currSubject]])){
+          rep(paste0(cellSubset), nrow(flowCore::exprs(get(cellSubset)[[currSubject]])))
+        }
       )
     }
     tmpExpr$cellSubset = temp_cellSubsets
@@ -244,6 +246,7 @@ setupDiscovrExperiment <- function(
 #' @seealso \code{\link{setupDiscovrExperiment}} \code{\link{discovrExperiment}}
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
 #' @import dplyr
+#' @importFrom rlang .data
 #' @importFrom flowCore exprs
 #' @importFrom igraph graph.data.frame cluster_louvain membership modularity
 #' @export
@@ -363,18 +366,18 @@ clusterDiscovrExperiment <- function(
 
   ### TODO FROM HERE
   clusterMeans <- experiment$mergedExpr %>%
-    dplyr::select(-cellSubset) %>%
-    dplyr::group_by(samp, RPclust) %>%
+    dplyr::select(-.data$cellSubset) %>%
+    dplyr::group_by(.data$samp, .data$RPclust) %>%
     dplyr::summarise_all(mean) %>%
-    dplyr::mutate(RPclust = as.character(RPclust))
+    dplyr::mutate(RPclust = as.character(.data$RPclust))
 
   # MGR - comments retained from original code. What is intent here?
   ##################################
   # Calculate total CD8 mean expression for each subject
   ##NEED TO CHANGE -cell_subset to something else???
   parentMeans = experiment$mergedExpr %>%
-    dplyr::select(-cellSubset, -RPclust) %>%
-    dplyr::group_by(samp) %>%
+    dplyr::select(-.data$cellSubset, -.data$RPclust) %>%
+    dplyr::group_by(.data$samp) %>%
     dplyr::summarise_all(mean) %>%
     dplyr::mutate(RPclust = "Total_Parent")
 
@@ -383,8 +386,8 @@ clusterDiscovrExperiment <- function(
   # Count cells of each subpopulation (eg Tmr) in each phenograph cluster (from each sample)
   clusterRarePopCts <-
     experiment$mergedExpr %>%
-    dplyr::select(samp, cellSubset, RPclust) %>%
-    dplyr::group_by(samp, RPclust) %>%
+    dplyr::select(.data$samp, .data$cellSubset, .data$RPclust) %>%
+    dplyr::group_by(.data$samp, .data$RPclust) %>%
     dplyr::summarise(Total=n(), .groups = "drop_last") %>%
     as.data.frame()
 
@@ -393,9 +396,9 @@ clusterDiscovrExperiment <- function(
   for(currCellSubset in uniqueSubsets){
     if(verbose){message("Counting cluster events for ", currCellSubset)}
     additionalMatrix = experiment$mergedExpr %>%
-      dplyr::select(samp, cellSubset, RPclust) %>%
-      group_by(samp, RPclust) %>%
-      summarise(number = sum(cellSubset == currCellSubset)) %>%
+      dplyr::select(.data$samp, .data$cellSubset, .data$RPclust) %>%
+      group_by(.data$samp, .data$RPclust) %>%
+      summarise(number = sum(.data$cellSubset == currCellSubset)) %>%
       as.data.frame()
     clusterRarePopCts <- cbind(clusterRarePopCts, additionalMatrix$number)
   }
@@ -405,10 +408,10 @@ clusterDiscovrExperiment <- function(
   }
 
   aggregateCounts = clusterRarePopCts %>%
-    dplyr::select(-RPclust) %>%
-    group_by(samp) %>%
+    dplyr::select(-.data$RPclust) %>%
+    group_by(.data$samp) %>%
     summarise_all(sum) %>%
-    rename_at(vars(-samp),function(name) paste0(name,"_tot"))
+    rename_at(vars(-.data$samp),function(name) paste0(name,"_tot"))
 
   clusterRarePopCts = left_join(clusterRarePopCts, aggregateCounts)
 

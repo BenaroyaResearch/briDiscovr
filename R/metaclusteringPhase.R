@@ -25,10 +25,10 @@
 #' @seealso \code{\link{setupDiscovrExperiment}} \code{\link{clusterDiscovrExperiment}}
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
 #' @import dplyr
+#' @importFrom rlang .data :=
 #' @importFrom tidyr gather
 #' @importFrom flowCore exprs
 #' @importFrom stats as.hclust sd cutree
-#' @importFrom igraph graph.data.frame cluster_louvain membership modularity
 #' @export
 metaclusterDiscovrExperiment <- function(
   experiment,
@@ -65,41 +65,41 @@ metaclusterDiscovrExperiment <- function(
   experiment$clusterRarePopCts <-
     # clean up data
     experiment$clusterRarePopCts %>%
-    dplyr::mutate(RPclust = as.character(RPclust)) %>%
+    dplyr::mutate(RPclust = as.character(.data$RPclust)) %>%
     left_join(experiment$clusterMeans, by = c("samp", "RPclust")) %>%
-    dplyr::filter(!samp %in% dropSamples) %>%
+    dplyr::filter(!.data$samp %in% dropSamples) %>%
     # Identify low abundance clusters (containing <threshold% of events per subject)
-    dplyr::group_by(samp) %>%
-    dplyr::mutate(totalEvents = sum(Total)) %>%
+    dplyr::group_by(.data$samp) %>%
+    dplyr::mutate(totalEvents = sum(.data$Total)) %>%
     dplyr::ungroup() %>%
-    dplyr::mutate(pctCellsInClust = (Total/totalEvents)*100) %>%
-    dplyr::filter(pctCellsInClust >= pctInClusterThreshold)
+    dplyr::mutate(pctCellsInClust = (.data$Total/.data$totalEvents)*100) %>%
+    dplyr::filter(.data$pctCellsInClust >= pctInClusterThreshold)
 
   # remove samples and low-abundance clusters from mean data
   experiment$clusterMeans <-
     experiment$clusterMeans %>%
-    dplyr::filter(!samp %in% dropSamples) %>%
-    dplyr::mutate(RPclust = as.character(RPclust)) %>%
-    dplyr::filter(RPclust %in% c(experiment$clusterRarePopCts$RPclust, "Total_Parent"))
+    dplyr::filter(!.data$samp %in% dropSamples) %>%
+    dplyr::mutate(RPclust = as.character(.data$RPclust)) %>%
+    dplyr::filter(.data$RPclust %in% c(experiment$clusterRarePopCts$RPclust, "Total_Parent"))
 
   # remove samples and low-abundance clusters from expr data
   experiment$mergedExpr <-
     experiment$mergedExpr %>%
-    dplyr::filter(!samp %in% dropSamples) %>%
-    dplyr::mutate(RPclust = as.character(RPclust)) %>%
-    dplyr::filter(RPclust %in% experiment$clusterRarePopCts$RPclust)
+    dplyr::filter(!.data$samp %in% dropSamples) %>%
+    dplyr::mutate(RPclust = as.character(.data$RPclust)) %>%
+    dplyr::filter(.data$RPclust %in% experiment$clusterRarePopCts$RPclust)
 
   # Compute the per-subject/per-cluster standard deviation to later compute z-score
   markerStdDev <-
     experiment$mergedExpr %>%
-    dplyr::select(-cellSubset) %>%
-    dplyr::group_by(samp, RPclust) %>%
+    dplyr::select(-.data$cellSubset) %>%
+    dplyr::group_by(.data$samp, .data$RPclust) %>%
     dplyr::summarise_all(sd)
 
   # Calculate parent pop standard deviations for each sample
   parentStdDev <- experiment$mergedExpr %>%
-    dplyr::select(-cellSubset, -RPclust) %>%
-    dplyr::group_by(samp) %>%
+    dplyr::select(-.data$cellSubset, -.data$RPclust) %>%
+    dplyr::group_by(.data$samp) %>%
     dplyr::summarise_all(sd) %>%
     dplyr::mutate(RPclust = "Total_Parent")
 
@@ -108,20 +108,20 @@ metaclusterDiscovrExperiment <- function(
 
   # format mean/var data for ease of use
   subjectMeans = experiment$clusterMeans %>%
-    dplyr::filter(RPclust == "Total_Parent") %>%
-    dplyr::select(-RPclust) %>%
-    tidyr::gather("marker", "subjectMean", -samp) %>%
-    dplyr::rename(subject = samp)
+    dplyr::filter(.data$RPclust == "Total_Parent") %>%
+    dplyr::select(-.data$RPclust) %>%
+    tidyr::gather("marker", "subjectMean", -.data$samp) %>%
+    dplyr::rename(subject = .data$samp)
 
   subjectStdDevs = markerStdDev %>%
-    dplyr::filter(RPclust == "Total_Parent") %>%
-    dplyr::select(-RPclust) %>%
-    tidyr::gather("marker", "subjectStdDev", -samp) %>%
-    dplyr::rename(subject = samp)
+    dplyr::filter(.data$RPclust == "Total_Parent") %>%
+    dplyr::select(-.data$RPclust) %>%
+    tidyr::gather("marker", "subjectStdDev", -.data$samp) %>%
+    dplyr::rename(subject = .data$samp)
 
   subjectMeanVar <-
     dplyr::left_join(subjectMeans, subjectStdDevs, by = c("subject", "marker")) %>%
-    dplyr::mutate(subjectVar = subjectStdDev **2)
+    dplyr::mutate(subjectVar = .data$subjectStdDev **2)
 
   #########################################################################
   # Section 3.c from original SOP - calculate z-scores
@@ -141,7 +141,7 @@ metaclusterDiscovrExperiment <- function(
     dfAllSubsets <- dplyr::bind_rows(
       dfAllSubsets,
       experiment$clusterRarePopCts %>%
-        dplyr::rename(subject = samp) %>%
+        dplyr::rename(subject = .data$samp) %>%
         dplyr::filter(!!as.symbol(currSubset) > 0)
     ) %>%
     unique()
@@ -152,16 +152,16 @@ metaclusterDiscovrExperiment <- function(
   ## Include regardless of colorbar visualization
   clustSigPass <-
     dfAllSubsets %>%
-    dplyr::select(subject, RPclust, !!subsets) %>%
-    dplyr::mutate(sample = paste0(.$subject, "_", .$RPclust))
+    dplyr::select(.data$subject, .data$RPclust, !!subsets) %>%
+    dplyr::mutate(sample = paste0(.data$subject, "_", .data$RPclust))
 
-  subsetEventCounting <- clustSigPass %>% dplyr::select(sample, !!subsets)
+  subsetEventCounting <- clustSigPass %>% dplyr::select(.data$sample, !!subsets)
 
   # for each subset (ie: tmr) compute the fraction of all events that fall in each cluster
   for(currSubset in subsets){
     currTot <- paste0("total", currSubset)
     clustSigPass <-
-      dplyr::group_by(clustSigPass, subject) %>%
+      dplyr::group_by(.data$clustSigPass, .data$subject) %>%
       dplyr::mutate(!!currTot := sum(.data[[currSubset]])) %>%
       dplyr::ungroup() %>%
       dplyr::mutate(!!currSubset := .data[[currSubset]]/.data[[currTot]])
@@ -174,32 +174,38 @@ metaclusterDiscovrExperiment <- function(
   # Create main data object for plotting heatmaps
   hmapDfAllSubsets <-
     dfAllSubsets %>%
-    dplyr::select(subject, RPclust, one_of(markers)) %>%
+    dplyr::select(.data$subject, .data$RPclust, one_of(markers)) %>%
     reshape2::melt(id.vars = c("subject", "RPclust")) %>%
-    dplyr::rename(marker = variable, mean = value) %>%
+    dplyr::rename(marker = .data$variable, mean = .data$value) %>%
     merge(subjectMeanVar, by=c("subject", "marker")) %>%
     ## Apply z-score here!
     mutate(
-      subjectZScore = (mean - subjectMean)/subjectStdDev,
-      subjectArcsinhMean = mean,
-      sample = paste0(.$subject, "_", .$RPclust)
+      subjectZScore = (.data$mean - .data$subjectMean)/.data$subjectStdDev,
+      subjectArcsinhMean = .data$mean,
+      sample = paste0(.data$subject, "_", .data$RPclust)
     ) %>%
-    dplyr::select(sample, subject, marker, subjectZScore, subjectArcsinhMean) %>%
+    dplyr::select(
+      .data$sample,
+      .data$subject,
+      .data$marker,
+      .data$subjectZScore,
+      .data$subjectArcsinhMean
+    ) %>%
     merge(clustSigPass, by="sample")
 
   # Extract the z-scores for all subjects
   allSubsetAllSubjectZscores <-
     hmapDfAllSubsets %>%
-    reshape2::dcast(marker ~ sample, value.var = "subjectZScore") %>%
-    magrittr::set_rownames(.$marker) %>%
-    dplyr::select(-marker)
+    reshape2::dcast(.data$marker ~ .data$sample, value.var = "subjectZScore") %>%
+    magrittr::set_rownames(.data$marker) %>%
+    dplyr::select(-.data$marker)
 
   # Extract the arcsinh fluorescence values for all subjects
   allSubsetAllSubjectArcsinh <-
     hmapDfAllSubsets %>%
-    reshape2::dcast(marker ~ sample, value.var = "subjectArcsinhMean") %>%
-    magrittr::set_rownames(.$marker) %>%
-    dplyr::select(-marker)
+    reshape2::dcast(.data$marker ~ .data$sample, value.var = "subjectArcsinhMean") %>%
+    magrittr::set_rownames(.data$marker) %>%
+    dplyr::select(-.data$marker)
 
   # use ComplexHeatmap as a convenient way of applying metaclustering
   metaxHeatmap <- ComplexHeatmap::Heatmap(
@@ -257,7 +263,6 @@ metaclusterDiscovrExperiment <- function(
 #' @import dplyr
 #' @importFrom flowCore exprs
 #' @importFrom stats as.hclust sd cutree
-#' @importFrom igraph graph.data.frame cluster_louvain membership modularity
 #' @export
 recutMetaclusters <- function(
   experiment,
