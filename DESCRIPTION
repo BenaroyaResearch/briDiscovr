@@ -30,6 +30,8 @@ Imports:
     reshape2,
     flowCore,
     ComplexHeatmap,
+    RColorBrewer,
+    circlize,
     viridisLite,
     grid
 
