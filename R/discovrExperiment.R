@@ -19,7 +19,7 @@
 #'
 #' @param x object to be tested for class discovrExperiment
 #'
-#' @aliases is.discovrExperiment
+#' @aliases discovrExperiment is.discovrExperiment
 #'
 #' @seealso \code{\link{setupDiscovrExperiment}}
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}

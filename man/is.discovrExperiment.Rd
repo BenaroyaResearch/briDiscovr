@@ -2,6 +2,7 @@
 % Please edit documentation in R/discovrExperiment.R
 \name{is.discovrExperiment}
 \alias{is.discovrExperiment}
+\alias{discovrExperiment}
 \title{discovrExperiment S3 class}
 \usage{
 ## S3 methods for class 'tcrGraph'
