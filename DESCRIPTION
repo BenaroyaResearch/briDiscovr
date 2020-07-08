@@ -23,9 +23,13 @@ Imports:
     Rcpp (>= 0.12.0),
     methods,
     dplyr,
-    readr,
-    flowCore,
-    ComplexHeatmap,
+    tidyr,
+    readr,    
     magrittr,
     stringr,
-    reshape2
+    reshape2,
+    flowCore,
+    ComplexHeatmap,
+    viridisLite,
+    grid
+
