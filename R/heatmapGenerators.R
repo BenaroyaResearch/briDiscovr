@@ -225,7 +225,7 @@ makeMetaclusterHeatmaps <- function(
     cluster_columns = F,
     column_order = ComplexHeatmap::column_order(zscore_hmap),
     cluster_rows = F,
-    row_order = experiment$metaclusteringMarkers[marker_order],
+    row_order = experiment$metaclusterMarkers[marker_order],
     #split = rep(c("", " "), c(length(marker_order), 2)),
     gap = unit(5, "mm"),
     show_column_names = F,
@@ -252,11 +252,11 @@ makeMetaclusterHeatmaps <- function(
     dplyr::mutate(subj_event = sum(n_event)) %>%
     dplyr::ungroup() %>%
     dplyr::mutate(proportion = n_event/subj_event) %>%
-    dplyr::mutate_at(experiment$metaclusteringMarkers, funs(.*proportion)) %>%
+    dplyr::mutate_at(experiment$metaclustergMarkers, funs(.*proportion)) %>%
     dplyr::select(-sample, -!!subsets, -n_event, -subj, -RP_clust, -subj_event) %>%
     dplyr::group_by(group) %>%
     dplyr::summarise_all(sum) %>%
-    dplyr::mutate_at(experiment$metaclusteringMarkers, funs(./proportion)) %>%
+    dplyr::mutate_at(experiment$metaclusterMarkers, funs(./proportion)) %>%
     dplyr::select(-group, -proportion) %>%
     t
 
@@ -292,7 +292,7 @@ makeMetaclusterHeatmaps <- function(
     column_title_gp = titleFontParam,
     cluster_columns = F,
     cluster_rows = F,
-    row_order = experiment$metaclusteringMarkers[marker_order],
+    row_order = experiment$metaclusterMarkers[marker_order],
     #split = rep(c("", " "), c(length(marker_order), 2)),
     gap = unit(5, "mm"),
     #combined_name_fun = NULL,
@@ -332,10 +332,10 @@ makeMetaclusterHeatmaps <- function(
     dplyr::mutate(subj_event = sum(n_event)) %>%
     dplyr::ungroup() %>%
     dplyr::mutate(proportion = n_event/subj_event) %>%
-    dplyr::mutate_at(experiment$metaclusteringMarkers, funs(.*proportion)) %>%
+    dplyr::mutate_at(experiment$metaclusterMarkers, funs(.*proportion)) %>%
     dplyr::select(-sample, -!!subsets, -n_event, -subj, -RP_clust, -subj_event) %>%
     dplyr::summarise_all(sum) %>%
-    dplyr::mutate_at(experiment$metaclusteringMarkers, funs(./proportion)) %>%
+    dplyr::mutate_at(experiment$metaclusterMarkers, funs(./proportion)) %>%
     dplyr::select(-proportion) %>%
     t
 
