@@ -2,13 +2,14 @@
 % Please edit documentation in R/heatmapGenerators.R
 \name{makeMetaclusterHeatmaps}
 \alias{makeMetaclusterHeatmaps}
-\title{Perform metaclustering for a DISCOV-R experiment}
+\title{Generate heatmaps from a metaclustered experiment}
 \usage{
 makeMetaclusterHeatmaps(
   experiment,
   parentSubset = NA,
   childSubsets = NA,
-  filenamePrefix = paste0(format(Sys.Date(), "\%y\%m\%d"), "-Zscores-perSubj"),
+  filenamePrefix = NA,
+  parentTitle = "Parent",
   verbose = TRUE
 )
 }
@@ -26,7 +27,10 @@ If this is left NA, then it's assumed the first subset listed in the experiment'
 population and all other subsets are rare populations. (default: NA)}
 
 \item{filenamePrefix}{A string indicating the prefix to use for each file that gets saved.
-This can include a directory path. (default: paste0(format(Sys.Date(), "%y%m%d"), "-Zscores-perSubj"))}
+This can include a directory path. If left as NA, will use the current date as the prefix
+with the format YYMMDD. (default: NA)}
+
+\item{parentTitle}{A string to use to label the parent population heatmaps (default: "Parent")}
 
 \item{verbose}{A boolean specifying whether to display processing messages (default: TRUE)}
 }
@@ -34,7 +38,7 @@ This can include a directory path. (default: paste0(format(Sys.Date(), "%y%m%d")
 An S3 object of class \code{discovrExperiment}
 }
 \description{
-Perform metaclustering for a DISCOV-R experiment
+Generate heatmaps from a metaclustered experiment
 }
 \seealso{
 \code{\link{setupDiscovrExperiment}} \code{\link{clusterDiscovrExperiment}} \code{\link{metaclusterDiscovrExperiment}}

@@ -1,5 +1,8 @@
+## Copyright (C) 2020  Mario Rosasco and Benaroya Research Institute
+##
+## This file is part of the briDiscovr package
 
-#' Perform metaclustering for a DISCOV-R experiment
+#' Generate heatmaps from a metaclustered experiment
 #'
 #' @param experiment A discovrExperiment created using \code{setupDiscovrExperiment},
 #' clustered using \code{clusterDiscovrExperiment}, and metaclustered with
@@ -11,7 +14,9 @@
 #' If this is left NA, then it's assumed the first subset listed in the experiment's fcsInfo file is the parent
 #' population and all other subsets are rare populations. (default: NA)
 #' @param filenamePrefix A string indicating the prefix to use for each file that gets saved.
-#' This can include a directory path. (default: paste0(format(Sys.Date(), "%y%m%d"), "-Zscores-perSubj"))
+#' This can include a directory path. If left as NA, will use the current date as the prefix
+#' with the format YYMMDD. (default: NA)
+#' @param parentTitle A string to use to label the parent population heatmaps (default: "Parent")
 #' @param verbose A boolean specifying whether to display processing messages (default: TRUE)
 #' @return An S3 object of class \code{discovrExperiment}
 #'
@@ -19,13 +24,15 @@
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
 #' @import dplyr
 #' @importFrom flowCore exprs
-#' @importFrom igraph graph.data.frame cluster_louvain membership modularity
+#' @importFrom RColorBrewer brewer.pal
+#' @importFrom circlize colorRamp2
 #' @export
 makeMetaclusterHeatmaps <- function(
   experiment,
   parentSubset = NA,
   childSubsets = NA,
-  filenamePrefix = paste0(format(Sys.Date(), "%y%m%d"), "-Zscores-perSubj"),
+  filenamePrefix = NA,
+  parentTitle = "Parent",
   verbose = TRUE
 ){
   # check for experiment data object
@@ -79,6 +86,11 @@ makeMetaclusterHeatmaps <- function(
       ") was not found in the list of all cell subsets: ",
       paste0(subsets, collapse = "; ")
     )
+  }
+
+  # Set up the file name prefix
+  if(is.na(filenamePrefix)){
+    filenamePrefix <- format(Sys.Date(), "%y%m%d-")
   }
 
   # TODO: check color palettes
@@ -252,7 +264,7 @@ makeMetaclusterHeatmaps <- function(
     dplyr::mutate(subj_event = sum(n_event)) %>%
     dplyr::ungroup() %>%
     dplyr::mutate(proportion = n_event/subj_event) %>%
-    dplyr::mutate_at(experiment$metaclustergMarkers, funs(.*proportion)) %>%
+    dplyr::mutate_at(experiment$metaclusterMarkers, funs(.*proportion)) %>%
     dplyr::select(-sample, -!!subsets, -n_event, -subj, -RP_clust, -subj_event) %>%
     dplyr::group_by(group) %>%
     dplyr::summarise_all(sum) %>%
@@ -317,7 +329,7 @@ makeMetaclusterHeatmaps <- function(
   ## Weighted Average phenotype for total CD8s
   # weighted by proportion of cells in a subject (not by number of cells) in order to allow
   # equivalent contributions from subjects with disparate numbers of collected events
-  cd8_avg <-
+  parentPopulationAvg <-
     data.frame(t(experiment$allSubsetAllSubjectArcsinh)) %>%
     dplyr::mutate(sample = rownames(.)) %>%
     merge(experiment$subsetEventCounting, by = "sample") %>%
@@ -339,14 +351,14 @@ makeMetaclusterHeatmaps <- function(
     dplyr::select(-proportion) %>%
     t
 
-  colnames(cd8_avg) = "CD8"
+  colnames(parentPopulationAvg) = parentTitle
 
   #Did not work
-  cd8_hm <- ComplexHeatmap::Heatmap(
-    cd8_avg,
+  parentWeightedAvgHeatmap <- ComplexHeatmap::Heatmap(
+    parentPopulationAvg,
     col = my_arcsinh_pal,
     name = "MFI",
-    column_title = paste0("Total CD8+"),
+    column_title = paste0("Total ", parentTitle),
     column_title_gp = titleFontParam,
     cluster_columns = F,
     cluster_rows = F,
@@ -359,11 +371,11 @@ makeMetaclusterHeatmaps <- function(
     heatmap_legend_param = legendParams
   )
 
-  png(filename = paste0(filenamePrefix, "_", experiment$linkage, "_CD8_arcsinh_weightedAvg.png"),
+  png(filename = paste0(filenamePrefix, "_", experiment$linkage, "_", parentTitle, "_arcsinh_weightedAvg.png"),
       width = 700,
       height = 2500,
       res = 300)
-  print(cd8_hm)
+  print(parentWeightedAvgHeatmap)
   dev.off()
 
   #########################################################################
