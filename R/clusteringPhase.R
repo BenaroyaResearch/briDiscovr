@@ -237,6 +237,7 @@ setupDiscovrExperiment <- function(
 #' @param experiment A discovrExperiment created using \code{setupDiscovrExperiment()}
 #' @param method A character string indicating the clustering method to use.
 #' Currently only 'phenograph' is supported as a clustering method.
+#' @param seed A number to be used as the seed for pseudorandom number generation (default: 12345)
 #' @param verbose A boolean specifying whether to display processing messages (default: TRUE)
 #' @return An S3 object of class \code{discovrExperiment}
 #'
@@ -249,6 +250,7 @@ setupDiscovrExperiment <- function(
 clusterDiscovrExperiment <- function(
   experiment,
   method = "phenograph",
+  seed = 12345,
   verbose = TRUE
 ){
   if(!is.discovrExperiment(experiment)){
@@ -257,6 +259,8 @@ clusterDiscovrExperiment <- function(
       "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
     )
   }
+
+  set.seed(12345)
 
   #########################################################################
   # Section 2.d.i from original SOP - Phenograph clustering - takes a while
