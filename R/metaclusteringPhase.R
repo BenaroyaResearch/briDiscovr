@@ -12,7 +12,6 @@
 #' @param dropMarkers A string or vector of strings indicating names of markers to exclude
 #' from analysis. Note that printing the experiment object will display a list of all
 #' markers. By default all markers will be included. (default: NA)
-#' 'markerInfoFile'
 #' @param pctInClusterThreshold A numeric indicating a percentage. Cluster with event
 #' occupancy below this threshold will be considered 'low-abundance' and will be
 #' dropped from further analysis (default: 1)
@@ -26,7 +25,9 @@
 #' @seealso \code{\link{setupDiscovrExperiment}} \code{\link{clusterDiscovrExperiment}}
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
 #' @import dplyr
+#' @importFrom tidyr gather
 #' @importFrom flowCore exprs
+#' @importFrom stats as.hclust sd cutree
 #' @importFrom igraph graph.data.frame cluster_louvain membership modularity
 #' @export
 metaclusterDiscovrExperiment <- function(
@@ -115,7 +116,7 @@ metaclusterDiscovrExperiment <- function(
   subjectStdDevs = markerStdDev %>%
     dplyr::filter(RPclust == "Total_Parent") %>%
     dplyr::select(-RPclust) %>%
-    gather("marker", "subjectStdDev", -samp) %>%
+    tidyr::gather("marker", "subjectStdDev", -samp) %>%
     dplyr::rename(subject = samp)
 
   subjectMeanVar <-
@@ -204,16 +205,18 @@ metaclusterDiscovrExperiment <- function(
   metaxHeatmap <- ComplexHeatmap::Heatmap(
     allSubsetAllSubjectZscores,
     clustering_method_columns = linkage,
-    clustering_distance_rows = distance,
+    clustering_distance_columns = distance,
     clustering_method_rows = linkage,
     clustering_distance_rows = distance
   )
 
   # cut the heatmap dendrogram to get phenotypic metaclusters
-  colIndices <- stats::cutree(
+  colIndices <- cutree(
     as.hclust(ComplexHeatmap::column_dend(metaxHeatmap)),
     k = nMetaclusters
   )
+  # actual number of groups after cutting the tree
+  kGroups <- length(unique(colIndices))
 
   ####################################################
   # attach data and return metaclustered experiment
@@ -225,8 +228,10 @@ metaclusterDiscovrExperiment <- function(
   experiment$allSubsetAllSubjectZscores   <- allSubsetAllSubjectZscores
   experiment$allSubsetAllSubjectArcsinh   <- allSubsetAllSubjectArcsinh
   experiment$subsetEventCounting          <- subsetEventCounting
+  experiment$metaclusterMarkers           <- markers
   experiment$nMetaclusters                <- nMetaclusters
   experiment$colIndices                   <- colIndices
+  experiment$kGroups                      <- kGroups
   experiment$linkage                      <- linkage
   experiment$distance                     <- distance
   experiment$status                       <- "metaclustered"
@@ -251,6 +256,7 @@ metaclusterDiscovrExperiment <- function(
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
 #' @import dplyr
 #' @importFrom flowCore exprs
+#' @importFrom stats as.hclust sd cutree
 #' @importFrom igraph graph.data.frame cluster_louvain membership modularity
 #' @export
 recutMetaclusters <- function(
@@ -269,29 +275,39 @@ recutMetaclusters <- function(
   }
   if(experiment$status != "metaclustered"){
     stop(
-      "The experiment must have already been metaclustered in order to be re-cut using this function.. ",
+      "The experiment must have already been metaclustered in order to be re-cut using this function. ",
       "The current experiment has a status of ", experiment$status, ". ",
       "Please use the function 'metaclusterDiscovrExperiment' if performing metaclustering for the first time."
+    )
+  }
+  if(!"allSubsetAllSubjectZscores" %in% names(experiment)){
+    stop(
+      "The object does not have the data expected in a metaclustered experiment. ",
+      "Please re-run the clustering and metaclustering steps and try again."
     )
   }
 
   # use ComplexHeatmap as a convenient way of applying metaclustering
   metaxHeatmap <- ComplexHeatmap::Heatmap(
-    allSubsetAllSubjectZscores,
+    experiment$allSubsetAllSubjectZscores,
     clustering_method_columns = linkage,
-    clustering_distance_rows = distance,
+    clustering_distance_columns = distance,
     clustering_method_rows = linkage,
     clustering_distance_rows = distance
   )
 
   # cut the heatmap dendrogram to get phenotypic metaclusters
-  colIndices <- stats::cutree(
+  colIndices <- cutree(
     as.hclust(ComplexHeatmap::column_dend(metaxHeatmap)),
     k = nMetaclusters
   )
+  # actual number of groups after cutting the tree
+  kGroups <- length(unique(colIndices))
+
 
   experiment$nMetaclusters                <- nMetaclusters
   experiment$colIndices                   <- colIndices
+  experiment$kGroups                      <- kGroups
   experiment$linkage                      <- linkage
   experiment$distance                     <- distance
   return(experiment)
