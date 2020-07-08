@@ -4,13 +4,20 @@
 \alias{clusterDiscovrExperiment}
 \title{Perform phenograph clustering for a DISCOV-R experiment}
 \usage{
-clusterDiscovrExperiment(experiment, method = "phenograph", verbose = TRUE)
+clusterDiscovrExperiment(
+  experiment,
+  method = "phenograph",
+  seed = 12345,
+  verbose = TRUE
+)
 }
 \arguments{
 \item{experiment}{A discovrExperiment created using \code{setupDiscovrExperiment()}}
 
 \item{method}{A character string indicating the clustering method to use.
 Currently only 'phenograph' is supported as a clustering method.}
+
+\item{seed}{A number to be used as the seed for pseudorandom number generation (default: 12345)}
 
 \item{verbose}{A boolean specifying whether to display processing messages (default: TRUE)}
 }
