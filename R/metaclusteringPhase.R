@@ -27,6 +27,7 @@
 #' @import dplyr
 #' @importFrom rlang .data :=
 #' @importFrom tidyr gather
+#' @importFrom tibble column_to_rownames
 #' @importFrom flowCore exprs
 #' @importFrom stats as.hclust sd cutree
 #' @export
@@ -161,7 +162,7 @@ metaclusterDiscovrExperiment <- function(
   for(currSubset in subsets){
     currTot <- paste0("total", currSubset)
     clustSigPass <-
-      dplyr::group_by(.data$clustSigPass, .data$subject) %>%
+      dplyr::group_by(clustSigPass, .data$subject) %>%
       dplyr::mutate(!!currTot := sum(.data[[currSubset]])) %>%
       dplyr::ungroup() %>%
       dplyr::mutate(!!currSubset := .data[[currSubset]]/.data[[currTot]])
@@ -196,16 +197,14 @@ metaclusterDiscovrExperiment <- function(
   # Extract the z-scores for all subjects
   allSubsetAllSubjectZscores <-
     hmapDfAllSubsets %>%
-    reshape2::dcast(.data$marker ~ .data$sample, value.var = "subjectZScore") %>%
-    magrittr::set_rownames(.data$marker) %>%
-    dplyr::select(-.data$marker)
+    reshape2::dcast(marker ~ sample, value.var = "subjectZScore") %>%
+    tibble::column_to_rownames("marker")
 
   # Extract the arcsinh fluorescence values for all subjects
   allSubsetAllSubjectArcsinh <-
     hmapDfAllSubsets %>%
-    reshape2::dcast(.data$marker ~ .data$sample, value.var = "subjectArcsinhMean") %>%
-    magrittr::set_rownames(.data$marker) %>%
-    dplyr::select(-.data$marker)
+    reshape2::dcast(marker ~ sample, value.var = "subjectArcsinhMean") %>%
+    tibble::column_to_rownames("marker")
 
   # use ComplexHeatmap as a convenient way of applying metaclustering
   metaxHeatmap <- ComplexHeatmap::Heatmap(
