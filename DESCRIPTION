@@ -36,4 +36,5 @@ Imports:
     circlize,
     viridisLite,
     grid
-
+Suggests: 
+    testthat
