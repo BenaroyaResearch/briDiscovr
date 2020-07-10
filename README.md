@@ -8,7 +8,7 @@ Functions implementing and supporting the "Distribution analysis across clusters
 
 ## Installation
 
-1. Install R v4.0+ from https://cloud.r-project.org/bin/windows/base/
+1. Install R v4.0+ from https://cloud.r-project.org/
   * If you're using Windows, you'll need to install Rtools40 from https://cran.r-project.org/bin/windows/Rtools/ as well
 2. Open R and install devtools using ```install.packages("devtools")```
 3. Install this package using ```devtools::install_github("BenaroyaResearch/briDiscovr")```
