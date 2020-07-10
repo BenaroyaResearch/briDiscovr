@@ -93,7 +93,8 @@ getSubjectCounts(myExpt)
 The experiment can then be saved using normal R data handling utilities. For example:
 
 ```R
-saveRDS(myExpt, "200709-textExpt.RDS")
+saveRDS(myExpt, "200709-testExpt.RDS")
+myExpt <- readRDS("200709-testExpt.RDS")
 ```
 
 ### Clustering
@@ -138,7 +139,7 @@ print(myExpt)
 
 ### Heatmaps
 
-Once you've performed metaclustering, you can use the function 'makeMetaclusterHeatmaps()` to produce and save heatmaps to summarize your data. By default this function assumes that the first subset listed in the `fcsInfoFile` used to initialize the experimnet is the parent population (eg: all CD8+s), and that all the remaining cell subsets are the rare/child populations. Details on explicitly assigning these populations for plotting are available in the docs at `?makeMetaclusterHeatmaps`. By default this function will save all heatmaps in the current working directory with the current date as the prefix, but this can be changed as in the example below.
+Once you've performed metaclustering, you can use the function `makeMetaclusterHeatmaps()` to produce and save heatmaps to summarize your data. By default this function assumes that the first subset listed in the `fcsInfoFile` used to initialize the experimnet is the parent population (eg: all CD8+s), and that all the remaining cell subsets are the rare/child populations. Details on explicitly assigning these populations for plotting are available in the docs at `?makeMetaclusterHeatmaps`. By default this function will save all heatmaps in the current working directory with the current date as the prefix, but this can be changed as in the example below.
 
 ```R
 makeMetaclusterHeatmaps(
