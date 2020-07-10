@@ -18,7 +18,7 @@ Functions implementing and supporting the "Distribution analysis across clusters
 
 ## Usage
 
-This package is based around the `discovrExperiment` object class, which is a list that holds all of the information about your experiment. You can save, load, and copy `discovrExperiment` object to facilitate different phases of the analysis.
+This package is based around the `discovrExperiment` object class, which is a list that holds all of the information about your experiment. You can save, load, and copy `discovrExperiment` objects to facilitate different phases of the analysis.
 
 ### Preparing to start your analysis
 
@@ -32,6 +32,14 @@ This file should contain 3 columns:
 * A column for the marker name as it's represented in the .fcs data (eg: "143Nd_CD45RA") - by default this column is expected to be named 'desc'
 * A column named 'useToCluster' that indicates whether the marker will be used for clustering. This column can only contain the values "TRUE"" or "FALSE".
 
+Example "markerInformation.csv": 
+
+| fixed | desc | useToCluster |
+| ----- | ---- | ------------ |
+| CD45	| 89Y_CD45 | TRUE |
+| GRZMA	| 141Pr_GRZMA	| FALSE |
+| ...   | ...  | ... |
+
 #### .fcs information file
 
 This file should contain 3 columns:
@@ -42,6 +50,14 @@ This file should contain 3 columns:
 * A column named 'filename' indicating where to find the .fcs file for that patient and cell subset (eg: "/Users/mrosasco/Documents/projects/briUtils/briDiscovr/testFiles/Xpb997364476_A2_CD8_T_Cells.fcs"). 
   * Note that it's possible to use paths relative to your working directory, but it's generally preferred to provide an absolute path.
   
+Example "fcsManifest.csv":
+
+| subject |	cellSubset | filename |
+| ------- | ---------- | -------- |
+| SubjXpb997364476 | A2_CD8_T_Cells | /Users/mrosasco/Documents/projects/briUtils/briDiscovr/testFiles/Xpb997364476_A2_CD8_T_Cells.fcs |
+| SubjXpb997364476 | A2_Er168+_EBV | /Users/mrosasco/Documents/projects/briUtils/briDiscovr/testFiles/Xpb997364476_A2_Er168+_EBV.fcs |
+| ... | ... | ... |
+  
 ### Setting up your experiment
 
 Once you have the information about your study design in your marker info and .fcs info files, you're ready to begin your analysis. This is done by using the `setupDiscovrExperiment()` function as shown below. More information about how to use this function can be accessed using `?setupDiscovrExperiment`.
@@ -50,8 +66,8 @@ Once you have the information about your study design in your marker info and .f
 library(briDiscovr)
 
 myExpt <- setupDiscovrExperiment(
-    markerInfoFile = "discovrTestData/markerInformation.csv",
-    fcsInfoFile = "discovrTestData/fcsManifest.csv",
+    markerInfoFile = "markerInformation.csv",
+    fcsInfoFile = "fcsManifest.csv",
     parentPopulation = "A2_CD8_T_Cells"
 )
 ```
