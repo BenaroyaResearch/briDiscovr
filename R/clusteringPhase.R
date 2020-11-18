@@ -263,7 +263,7 @@ clusterDiscovrExperiment <- function(
     )
   }
 
-  set.seed(12345)
+  set.seed(seed)
 
   #########################################################################
   # Section 2.d.i from original SOP - Phenograph clustering - takes a while
