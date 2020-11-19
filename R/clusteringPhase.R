@@ -340,6 +340,7 @@ clusterDiscovrExperiment <- function(
   }
 
   # Run phenograph (using kd treetype) on each subject.
+  # Note that here 'fcs' is the flowFrame object for a subject post-transformation
   phenographClust = function(fcs, clusteringMarkers) {
     exprsMat = as.matrix(as.data.frame(exprs(fcs))[,clusteringMarkers])
     rPhenoVect = as.numeric(igraph::membership(runRpheno(data = exprsMat)))
