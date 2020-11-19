@@ -54,7 +54,7 @@ setupDiscovrExperiment <- function(
   if(!all(c(markerCommonField, markerFcsField, "useToCluster") %in% names(markerInfo))){
     stop(
       "The file set as 'markerInfoFile' must contain columns with names 'useToCluster' and the names ",
-      "specified by commonMarkerField and fcsMarkerField. Please check your markerInfo file and try again."
+      "specified by markerCommonField and markerFcsField Please check your markerInfo file and try again."
     )
   }
   if(!all(is.logical(markerInfo$useToCluster))){
