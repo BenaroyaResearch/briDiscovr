@@ -137,25 +137,38 @@ print(myExpt)
 # Experiment status: metaclustered
 ```
 
-After performing metaclustering, you can retrieve the fraction of events for each subject and subset that were assigned to each metacluster using the utility function `getMetaclusterOccupancy`.
+After performing metaclustering, you can retrieve the event counts and fraction of events for each subject and subset that were assigned to each metacluster using the utility function `getMetaclusterOccupancy`.
 
 ```R
 getMetaclusterOccupancy(myExpt)
 
 ## Prints:
-#             subject    metacluster A2_CD8_T_Cells A2_Er168+_EBV A2_Tm169+_CMV A2_Yb174+_Flu
-# 1  SubjXpb997364476  metacluster_1           0.01          0.00          0.00          0.00
-# 2  SubjXpb997364476  metacluster_2           0.16          0.11          0.24          0.12
-# 3  SubjXpb997364476  metacluster_3           0.15          0.14          0.19          0.15
-# 4  SubjXpb997364476  metacluster_4           0.29          0.42          0.04          0.01
-# 5  SubjXpb997364476  metacluster_5           0.05          0.08          0.08          0.01
-# 6  SubjXpb997364476  metacluster_6           0.11          0.07          0.13          0.01
-# 7  SubjXpb997364476  metacluster_7           0.01          0.00          0.16          0.44
-# 8  SubjXpb997364476  metacluster_8           0.04          0.03          0.01          0.02
-# 9  SubjXpb997364476  metacluster_9           0.07          0.04          0.03          0.02
-# 10 SubjXpb997364476 metacluster_10           0.04          0.03          0.01          0.02
-# 11 SubjXpb997364476 metacluster_11           0.05          0.06          0.10          0.20
-# 12 SubjXpb997364476 metacluster_12           0.02          0.01          0.01          0.00
+#             subject    metacluster A2_CD8_T_Cells_frac A2_Er168+_EBV_frac A2_Tm169+_CMV_frac A2_Yb174+_Flu_frac A2_CD8_T_Cells_cts
+# 1  SubjXpb997364476  metacluster_1                0.01               0.00               0.00               0.00               1984
+# 2  SubjXpb997364476  metacluster_2                0.16               0.11               0.24               0.12              25815
+# 3  SubjXpb997364476  metacluster_3                0.15               0.14               0.19               0.15              23955
+# 4  SubjXpb997364476  metacluster_4                0.29               0.42               0.04               0.01              46547
+# 5  SubjXpb997364476  metacluster_5                0.05               0.08               0.08               0.01               8647
+# 6  SubjXpb997364476  metacluster_6                0.11               0.07               0.13               0.01              18105
+# 7  SubjXpb997364476  metacluster_7                0.01               0.00               0.16               0.44               1950
+# 8  SubjXpb997364476  metacluster_8                0.04               0.03               0.01               0.02               6746
+# 9  SubjXpb997364476  metacluster_9                0.07               0.04               0.03               0.02              11589
+# 10 SubjXpb997364476 metacluster_10                0.04               0.03               0.01               0.02               6430
+# 11 SubjXpb997364476 metacluster_11                0.05               0.06               0.10               0.20               7683
+# 12 SubjXpb997364476 metacluster_12                0.02               0.01               0.01               0.00               3720
+#    A2_Er168+_EBV_cts A2_Tm169+_CMV_cts A2_Yb174+_Flu_cts
+# 1                  2                 3                 0
+# 2                 53               530                88
+# 3                 64               432               110
+# 4                194                80                 7
+# 5                 39               170                 4
+# 6                 34               300                 9
+# 7                  2               356               321
+# 8                 12                31                14
+# 9                 18                75                11
+# 10                14                22                12
+# 11                26               219               146
+# 12                 5                15                 0
 ```
 
 These values are returned as a standard data frame, and can be saved or manipulated as usual, eg:

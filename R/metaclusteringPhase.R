@@ -240,13 +240,17 @@ metaclusterDiscovrExperiment <- function(
       dplyr::mutate(!!currTot := sum(.data[[currSubset]])) %>%
       dplyr::ungroup() %>%
       dplyr::group_by(.data$subject, .data$metacluster) %>%
-      dplyr::mutate(!!currSubset := sum(.data[[currSubset]])/.data[[currTot]]) %>%
+      dplyr::mutate(
+        !!paste0(currSubset, "_frac") := sum(.data[[currSubset]])/.data[[currTot]],
+        !!paste0(currSubset, "_cts") := sum(.data[[currSubset]])
+      ) %>%
       dplyr::ungroup()
   }
 
   # round the fractional occupancy to 2 sig. digits and extract data w/ labels
-  metaclusterOccupancy[,subsets] <- sapply(metaclusterOccupancy[,subsets], round, digits = 2)
-  metaclusterOccupancy <- metaclusterOccupancy[,c("subject", "metacluster", subsets)]
+  subsetColnames = c(paste0(subsets, "_frac"), paste0(subsets, "_cts"))
+  metaclusterOccupancy[,subsetColnames] <- sapply(metaclusterOccupancy[,subsetColnames], round, digits = 2)
+  metaclusterOccupancy <- metaclusterOccupancy[,c("subject", "metacluster", subsetColnames)]
   metaclusterOccupancy <- unique(metaclusterOccupancy)
 
   ####################################################
@@ -354,13 +358,17 @@ recutMetaclusters <- function(
       dplyr::mutate(!!currTot := sum(.data[[currSubset]])) %>%
       dplyr::ungroup() %>%
       dplyr::group_by(.data$subject, .data$metacluster) %>%
-      dplyr::mutate(!!currSubset := sum(.data[[currSubset]])/.data[[currTot]]) %>%
+      dplyr::mutate(
+        !!paste0(currSubset, "_frac") := sum(.data[[currSubset]])/.data[[currTot]],
+        !!paste0(currSubset, "_cts") := sum(.data[[currSubset]])
+      ) %>%
       dplyr::ungroup()
   }
 
   # round the fractional occupancy to 2 sig. digits and extract data w/ labels
-  metaclusterOccupancy[,subsets] <- sapply(metaclusterOccupancy[,subsets], round, digits = 2)
-  metaclusterOccupancy <- metaclusterOccupancy[,c("subject", "metacluster", subsets)]
+  subsetColnames = c(paste0(subsets, "_frac"), paste0(subsets, "_cts"))
+  metaclusterOccupancy[,subsetColnames] <- sapply(metaclusterOccupancy[,subsetColnames], round, digits = 2)
+  metaclusterOccupancy <- metaclusterOccupancy[,c("subject", "metacluster", subsetColnames)]
   metaclusterOccupancy <- unique(metaclusterOccupancy)
 
   experiment$nMetaclusters                <- nMetaclusters
