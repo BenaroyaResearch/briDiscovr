@@ -97,6 +97,19 @@ setupDiscovrExperiment <- function(
     )
   }
 
+  # check that each subject has only one .fcs file for each cellSubset
+  duplicatedSamples = duplicated(paste0(fcsInfo$subject, fcsInfo$cellSubset))
+  if(any(duplicatedSamples)){
+    stop(
+      "The following subject/cell subset pairs were duplicated in the .fcs list:\n",
+      apply(
+        fcsInfo[duplicatedSamples, c("subject", "cellSubset")],
+        1,
+        function(r){paste(c(r[1], " - ", r[2], "\n"))}
+      )
+    )
+  }
+
   # Check fcs files for byte offset issue that will prevent analysis
   filesWithOffsetIssues <- c()
   for(currFile in fcsInfo$filename){
@@ -136,7 +149,7 @@ setupDiscovrExperiment <- function(
     if(verbose){message(paste0("Assigning per-subject data for subset: ", currCellSubset, "..."))}
     assign(currCellSubset, buildFcsList(fcsInfo %>% dplyr::filter(.data$cellSubset == currCellSubset), truncate_max_range = FALSE))
   }
-  assign("allSubjects", buildFcsList(fcsInfo[!duplicated(fcsInfo$subject),], truncate_max_range = FALSE))
+  assign("allSubjects", buildFcsList(fcsInfo[fcsInfo$cellSubset == parentPopulation,], truncate_max_range = FALSE))
 
   # Process data
   processData <- function(fcs){
