@@ -223,6 +223,32 @@ metaclusterDiscovrExperiment <- function(
   # actual number of groups after cutting the tree
   kGroups <- length(unique(colIndices))
 
+  # compute fraction of each cell subset in each metax for each sample
+  metaclusterOccupancy <-
+    data.frame(
+      sample = names(colIndices),
+      metacluster = paste0("metacluster_", colIndices)
+    ) %>%
+    dplyr::left_join(subsetEventCounting, by = "sample") %>%
+    dplyr::mutate(subject = stringr::str_remove(.data$sample, "_[0-9]+$"))
+
+  # for each subset (ie: tmr) compute the fraction of all events that fall in each cluster
+  for(currSubset in subsets){
+    currTot <- paste0("total", currSubset)
+    metaclusterOccupancy <-
+      dplyr::group_by(metaclusterOccupancy, .data$subject) %>%
+      dplyr::mutate(!!currTot := sum(.data[[currSubset]])) %>%
+      dplyr::ungroup() %>%
+      dplyr::group_by(.data$subject, .data$metacluster) %>%
+      dplyr::mutate(!!currSubset := sum(.data[[currSubset]])/.data[[currTot]]) %>%
+      dplyr::ungroup()
+  }
+
+  # round the fractional occupancy to 2 sig. digits and extract data w/ labels
+  metaclusterOccupancy[,subsets] <- sapply(metaclusterOccupancy[,subsets], round, digits = 2)
+  metaclusterOccupancy <- metaclusterOccupancy[,c("subject", "metacluster", subsets)]
+  metaclusterOccupancy <- unique(metaclusterOccupancy)
+
   ####################################################
   # attach data and return metaclustered experiment
   ####################################################
@@ -235,6 +261,7 @@ metaclusterDiscovrExperiment <- function(
   experiment$subsetEventCounting          <- subsetEventCounting
   experiment$metaclusterMarkers           <- markers
   experiment$nMetaclusters                <- nMetaclusters
+  experiment$metaclusterOccupancy         <- metaclusterOccupancy
   experiment$colIndices                   <- colIndices
   experiment$kGroups                      <- kGroups
   experiment$linkage                      <- linkage
@@ -308,8 +335,36 @@ recutMetaclusters <- function(
   # actual number of groups after cutting the tree
   kGroups <- length(unique(colIndices))
 
+  # compute fraction of each cell subset in each metax for each sample
+  metaclusterOccupancy <-
+    data.frame(
+      sample = names(colIndices),
+      metacluster = paste0("metacluster_", colIndices)
+    ) %>%
+    dplyr::left_join(experiment$subsetEventCounting, by = "sample") %>%
+    dplyr::mutate(subject = stringr::str_remove(.data$sample, "_[0-9]+$"))
+
+  # for each subset (ie: tmr) compute the fraction of all events that fall in each cluster
+  subsets <- unique(experiment$fcsInfo$cellSubset)
+
+  for(currSubset in subsets){
+    currTot <- paste0("total", currSubset)
+    metaclusterOccupancy <-
+      dplyr::group_by(metaclusterOccupancy, .data$subject) %>%
+      dplyr::mutate(!!currTot := sum(.data[[currSubset]])) %>%
+      dplyr::ungroup() %>%
+      dplyr::group_by(.data$subject, .data$metacluster) %>%
+      dplyr::mutate(!!currSubset := sum(.data[[currSubset]])/.data[[currTot]]) %>%
+      dplyr::ungroup()
+  }
+
+  # round the fractional occupancy to 2 sig. digits and extract data w/ labels
+  metaclusterOccupancy[,subsets] <- sapply(metaclusterOccupancy[,subsets], round, digits = 2)
+  metaclusterOccupancy <- metaclusterOccupancy[,c("subject", "metacluster", subsets)]
+  metaclusterOccupancy <- unique(metaclusterOccupancy)
 
   experiment$nMetaclusters                <- nMetaclusters
+  experiment$metaclusterOccupancy         <- metaclusterOccupancy
   experiment$colIndices                   <- colIndices
   experiment$kGroups                      <- kGroups
   experiment$linkage                      <- linkage
