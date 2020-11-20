@@ -260,7 +260,7 @@ makeMetaclusterHeatmaps <- function(
     dplyr::mutate(subj_event = sum(.data$n_event)) %>%
     dplyr::ungroup() %>%
     dplyr::mutate(proportion = .data$n_event/.data$subj_event) %>%
-    dplyr::mutate_at(experiment$metaclusterMarkers, function(x){(x*.data$proportion)}) %>%
+    dplyr::mutate_at(experiment$metaclusterMarkers, list(~.*.data$proportion)) %>%
     dplyr::select(
       -.data$sample,
       -!!subsets,
@@ -270,7 +270,7 @@ makeMetaclusterHeatmaps <- function(
       -.data$subj_event) %>%
     dplyr::group_by(.data$group) %>%
     dplyr::summarise_all(sum) %>%
-    dplyr::mutate_at(experiment$metaclusterMarkers, function(x){(x/.data$proportion)}) %>%
+    dplyr::mutate_at(experiment$metaclusterMarkers, list(~./.data$proportion)) %>%
     dplyr::select(-.data$group, -.data$proportion) %>%
     t
 
@@ -344,7 +344,7 @@ makeMetaclusterHeatmaps <- function(
     dplyr::mutate(subj_event = sum(.data$n_event)) %>%
     dplyr::ungroup() %>%
     dplyr::mutate(proportion = .data$n_event/.data$subj_event) %>%
-    dplyr::mutate_at(experiment$metaclusterMarkers, function(x){(x*.data$proportion)}) %>%
+    dplyr::mutate_at(experiment$metaclusterMarkers, list(~.*.data$proportion)) %>%
     dplyr::select(
       -.data$sample,
       -!!subsets,
@@ -354,7 +354,7 @@ makeMetaclusterHeatmaps <- function(
       -.data$subj_event
     ) %>%
     dplyr::summarise_all(sum) %>%
-    dplyr::mutate_at(experiment$metaclusterMarkers, function(x){(x/.data$proportion)}) %>%
+    dplyr::mutate_at(experiment$metaclusterMarkers, list(~./.data$proportion)) %>%
     dplyr::select(-.data$proportion) %>%
     t
 
