@@ -137,6 +137,38 @@ print(myExpt)
 # Experiment status: metaclustered
 ```
 
+After performing metaclustering, you can retrieve the fraction of events for each subject and subset that were assigned to each metacluster using the utility function `getMetaclusterOccupancy`.
+
+```R
+getMetaclusterOccupancy(myExpt)
+
+## Prints:
+#             subject    metacluster A2_CD8_T_Cells A2_Er168+_EBV A2_Tm169+_CMV A2_Yb174+_Flu
+# 1  SubjXpb997364476  metacluster_1           0.01          0.00          0.00          0.00
+# 2  SubjXpb997364476  metacluster_2           0.16          0.11          0.24          0.12
+# 3  SubjXpb997364476  metacluster_3           0.15          0.14          0.19          0.15
+# 4  SubjXpb997364476  metacluster_4           0.29          0.42          0.04          0.01
+# 5  SubjXpb997364476  metacluster_5           0.05          0.08          0.08          0.01
+# 6  SubjXpb997364476  metacluster_6           0.11          0.07          0.13          0.01
+# 7  SubjXpb997364476  metacluster_7           0.01          0.00          0.16          0.44
+# 8  SubjXpb997364476  metacluster_8           0.04          0.03          0.01          0.02
+# 9  SubjXpb997364476  metacluster_9           0.07          0.04          0.03          0.02
+# 10 SubjXpb997364476 metacluster_10           0.04          0.03          0.01          0.02
+# 11 SubjXpb997364476 metacluster_11           0.05          0.06          0.10          0.20
+# 12 SubjXpb997364476 metacluster_12           0.02          0.01          0.01          0.00
+```
+
+These values are returned as a standard data frame, and can be saved or manipulated as usual, eg:
+
+```R
+metaxFreqValues = getMetaclusterOccupancy(myExpt)
+write.csv(
+  metaxFreqValues, 
+  file = file.path("Users", "mrosasco", "discovrOutput", format(Sys.Date(), "%y%m%d-clusterOccupancy.csv"))
+)
+```
+
+
 ### Heatmaps
 
 Once you've performed metaclustering, you can use the function `makeMetaclusterHeatmaps()` to produce and save heatmaps to summarize your data. By default this function assumes that the first subset listed in the `fcsInfoFile` used to initialize the experimnet is the parent population (eg: all CD8+s), and that all the remaining cell subsets are the rare/child populations. Details on explicitly assigning these populations for plotting are available in the docs at `?makeMetaclusterHeatmaps`. By default this function will save all heatmaps in the current working directory with the current date as the prefix, but this can be changed as in the example below.
