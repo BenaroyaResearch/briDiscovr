@@ -91,7 +91,6 @@ getFcsNEvents <- function(fcsFile) {
 #' @importFrom rlang .data
 #' @importFrom magrittr %>%
 #' @importFrom dplyr group_by summarise n rename
-#' @importFrom utils View
 #' @export
 getSubjectCounts <- function(experiment){
   if(!is.discovrExperiment(experiment)){
@@ -132,7 +131,6 @@ getSubjectCounts <- function(experiment){
 #' @importFrom rlang .data
 #' @importFrom magrittr %>%
 #' @importFrom dplyr group_by summarise n
-#' @importFrom utils View
 #' @export
 getSubjectClusters <- function(experiment){
   if(!is.discovrExperiment(experiment)){
@@ -162,3 +160,28 @@ getSubjectClusters <- function(experiment){
 
   return(nPhenoClusts)
 }
+
+#' Display the fraction of events that are found in each metacluster for each
+#' sample and cell subset
+#'
+#' @param experiment A discovrExperiment created using \code{setupDiscovrExperiment()}
+#' @return A data frame containing the fraction of events in each metacluster
+#'
+#' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}
+#' @export
+getMetaclusterOccupancy <- function(experiment){
+  if(!is.discovrExperiment(experiment)){
+    stop(
+      "The object passed to this function is not a valid DISCOV-R experiment object.",
+      "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
+    )
+  }
+  if (!'metaclusterOccupancy' %in% names(experiment)){
+    stop(
+      "The data passed to this function does not appear to have been metaclustered yet.",
+      "Please perform metaclustering using the 'metaclusterDiscovrExperiment' function and try again."
+    )
+  }
+  return(as.data.frame(experiment$metaclusterOccupancy))
+}
+
