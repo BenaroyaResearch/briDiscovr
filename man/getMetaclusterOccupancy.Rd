@@ -5,13 +5,15 @@
 \title{Display the fraction of events that are found in each metacluster for each
 sample and cell subset}
 \usage{
-getMetaclusterOccupancy(experiment)
+getMetaclusterOccupancy(experiment, precision = 2)
 }
 \arguments{
 \item{experiment}{A discovrExperiment created using \code{setupDiscovrExperiment()}}
+
+\item{precision}{An integer indicating the number of significant digits to return for fractional values}
 }
 \value{
-A data frame containing the fraction of events in each metacluster
+A data frame containing the fraction and number of events in each metacluster
 }
 \description{
 Display the fraction of events that are found in each metacluster for each

@@ -247,9 +247,8 @@ metaclusterDiscovrExperiment <- function(
       dplyr::ungroup()
   }
 
-  # round the fractional occupancy to 2 sig. digits and extract data w/ labels
+  # extract relevant data w/ labels
   subsetColnames = c(paste0(subsets, "_frac"), paste0(subsets, "_cts"))
-  metaclusterOccupancy[,subsetColnames] <- sapply(metaclusterOccupancy[,subsetColnames], round, digits = 2)
   metaclusterOccupancy <- metaclusterOccupancy[,c("subject", "metacluster", subsetColnames)]
   metaclusterOccupancy <- unique(metaclusterOccupancy)
 
@@ -365,9 +364,8 @@ recutMetaclusters <- function(
       dplyr::ungroup()
   }
 
-  # round the fractional occupancy to 2 sig. digits and extract data w/ labels
+  # extract relevant data w/ labels
   subsetColnames = c(paste0(subsets, "_frac"), paste0(subsets, "_cts"))
-  metaclusterOccupancy[,subsetColnames] <- sapply(metaclusterOccupancy[,subsetColnames], round, digits = 2)
   metaclusterOccupancy <- metaclusterOccupancy[,c("subject", "metacluster", subsetColnames)]
   metaclusterOccupancy <- unique(metaclusterOccupancy)
 

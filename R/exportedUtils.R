@@ -165,11 +165,13 @@ getSubjectClusters <- function(experiment){
 #' sample and cell subset
 #'
 #' @param experiment A discovrExperiment created using \code{setupDiscovrExperiment()}
-#' @return A data frame containing the fraction of events in each metacluster
+#' @param precision An integer indicating the number of significant digits to return for fractional values
+#' @return A data frame containing the fraction and number of events in each metacluster
 #'
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}
+#' @importFrom stringr str_detect
 #' @export
-getMetaclusterOccupancy <- function(experiment){
+getMetaclusterOccupancy <- function(experiment, precision=2){
   if(!is.discovrExperiment(experiment)){
     stop(
       "The object passed to this function is not a valid DISCOV-R experiment object.",
@@ -182,6 +184,14 @@ getMetaclusterOccupancy <- function(experiment){
       "Please perform metaclustering using the 'metaclusterDiscovrExperiment' function and try again."
     )
   }
-  return(as.data.frame(experiment$metaclusterOccupancy))
+  if (!is.numeric(precision) || precision %% 1 != 0){
+    stop("The 'precision' argument must be set to an integer number.")
+  }
+
+  metaxVals = experiment$metaclusterOccupancy
+  fracCols = stringr::str_detect(colnames(metaxVals), "_frac")
+  metaxVals[,fracCols] <- sapply(metaxVals[,fracCols], round, digits = precision)
+
+  return(as.data.frame(metaxVals))
 }
 
