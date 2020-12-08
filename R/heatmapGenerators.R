@@ -145,6 +145,46 @@ makeMetaclusterHeatmaps <- function(
     colors = intensityColors
   )
 
+  # Set up legend labels to accurately represent the data
+  zScoreMaxLabel = ifelse(
+    max(zScoreBreaks) < max(experiment$allSubsetAllSubjectZscores),
+    paste0("> ", max(zScoreBreaks)),
+    max(zScoreBreaks)
+  )
+  zScoreMinLabel = ifelse(
+    min(zScoreBreaks) > min(experiment$allSubsetAllSubjectZscores),
+    paste0("< ", min(zScoreBreaks)),
+    min(zScoreBreaks)
+  )
+  intensityMaxLabel = ifelse(
+    max(intensityBreaks) < max(experiment$allSubsetAllSubjectArcsinh),
+    paste0("> ", max(intensityBreaks)),
+    max(intensityBreaks)
+  )
+  intensityMinLabel = ifelse(
+    min(intensityBreaks) > min(experiment$allSubsetAllSubjectArcsinh),
+    paste0("< ", min(intensityBreaks)),
+    min(intensityBreaks)
+  )
+  intensityBreaks = sort(intensityBreaks)
+  zScoreBreaks = sort(zScoreBreaks)
+
+  intensityBreakLabels = intensityBreaks
+  intensityBreakLabels[1] = intensityMinLabel
+  intensityBreakLabels[length(intensityBreakLabels)] = intensityMaxLabel
+  zScoreBreakLabels = zScoreBreaks
+  zScoreBreakLabels[1] = zScoreMinLabel
+  zScoreBreakLabels[length(zScoreBreakLabels)] = zScoreMaxLabel
+
+  zScoreLegendParam = list(
+    at = zScoreBreaks,
+    labels = zScoreBreakLabels
+  )
+  intensityLegendParam = list(
+    at = intensityBreaks,
+    labels = intensityBreakLabels
+  )
+
 
   # get subject ids, assign colors to them
   subject_ids <- sort(unique(experiment$clusterRarePopCts$samp))
@@ -238,7 +278,7 @@ makeMetaclusterHeatmaps <- function(
     row_names_gp = marker_label_gp,
     # overall styling
     top_annotation = allSubsetZscoreAnno,
-    heatmap_legend_param = legendParams
+    heatmap_legend_param = zScoreLegendParam
   )
 
   png(
@@ -278,7 +318,7 @@ makeMetaclusterHeatmaps <- function(
     show_column_names = F,
     row_names_gp = marker_label_gp,
     top_annotation = allSubsetZscoreAnno,
-    heatmap_legend_param = legendParams)
+    heatmap_legend_param = intensityLegendParam)
   )
   dev.off()
 
@@ -350,7 +390,7 @@ makeMetaclusterHeatmaps <- function(
     show_column_names = F,
     row_names_gp = marker_label_gp,
     top_annotation = tmr_avg_anno,
-    heatmap_legend_param = legendParams
+    heatmap_legend_param = intensityLegendParam
   )
 
 
@@ -414,7 +454,7 @@ makeMetaclusterHeatmaps <- function(
     #combined_name_fun = NULL,
     show_column_names = F,
     row_names_gp = marker_label_gp,
-    heatmap_legend_param = legendParams
+    heatmap_legend_param = intensityLegendParam
   )
 
   png(filename = paste0(filenamePrefix, "_", experiment$linkage, "_", parentTitle, "_arcsinh_weightedAvg.png"),
