@@ -11,7 +11,7 @@
 #' \code{getSampleNames} can be used to view a list of all sample names. (default: NA)
 #' @param dropMarkers A string or vector of strings indicating names of markers to exclude
 #' from analysis. Note that printing the experiment object will display a list of all
-#' markers. By default all markers will be included. (default: NA)
+#' markers. By default all clustering markers will be included. (default: NA)
 #' @param pctInClusterThreshold A numeric indicating a percentage. Cluster with event
 #' occupancy below this threshold will be considered 'low-abundance' and will be
 #' dropped from further analysis (default: 1)
