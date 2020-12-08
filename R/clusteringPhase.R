@@ -239,6 +239,7 @@ setupDiscovrExperiment <- function(
   exptInProgress$markerInfo         <- markerInfo
   exptInProgress$fcsInfoFile        <- fcsInfoFile
   exptInProgress$fcsInfo            <- fcsInfo
+  exptInProgress$parentPopulation   <- parentPopulation
   exptInProgress$allDataTransformed <- allDataTransformed
   exptInProgress$mergedExpr         <- mergedExpr
   exptInProgress$clusteringMarkers  <- clusteringMarkers
@@ -377,18 +378,14 @@ clusterDiscovrExperiment <- function(
   # Sections 2.e.i from original SOP - Summarize and save outputs
   ###################################################################
   # Calculate mean expression value of each marker for each phenograph cluster in each subject
-
-  ### TODO FROM HERE
   clusterMeans <- experiment$mergedExpr %>%
     dplyr::select(-.data$cellSubset) %>%
     dplyr::group_by(.data$samp, .data$RPclust) %>%
     dplyr::summarise_all(mean) %>%
     dplyr::mutate(RPclust = as.character(.data$RPclust))
 
-  # MGR - comments retained from original code. What is intent here?
   ##################################
-  # Calculate total CD8 mean expression for each subject
-  ##NEED TO CHANGE -cell_subset to something else???
+  # Calculate total mean expression for each subject
   parentMeans = experiment$mergedExpr %>%
     dplyr::select(-.data$cellSubset, -.data$RPclust) %>%
     dplyr::group_by(.data$samp) %>%
