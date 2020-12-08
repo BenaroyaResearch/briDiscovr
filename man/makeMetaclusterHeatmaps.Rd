@@ -11,9 +11,9 @@ makeMetaclusterHeatmaps(
   parentTitle = "Parent",
   metaclusterColors = NA,
   zScoreBreaks = c(-2, 0, 2),
-  zScoreColors = c("#00ffffFF", "#000000FF", "#FDE725FF"),
-  intensityBreaks = c(0, 5),
-  intensityColors = c("#440154FF", "#FDE725FF"),
+  zScoreColors = c("#00FFFF", "#000000", "#FDE725"),
+  intensityBreaks = c(0, 2, 4, 6),
+  intensityColors = c("#4A0E53", "#925F54", "#D6B343", "#FDE727"),
   columnDendHeight = 10,
   rowDendWidth = 10,
   verbose = TRUE
@@ -41,13 +41,14 @@ Note that if a color vector is supplied, it must contain at least as many colors
 must have the same number of values as \code{zScoreColors}. (default: c(-2,0,2))}
 
 \item{zScoreColors}{A vector of strings indicating the colors used to represent the Z score value range. This vector
-must have the same number of values as \code{zScoreBreaks}. (default: c("#00ffffFF", "#000000FF", "#FDE725FF"))}
+must have the same number of values as \code{zScoreBreaks}. (default: c("#00FFFF", "#000000", "#FDE725"))}
 
 \item{intensityBreaks}{A vector of numbers indicating the values used to calibrate the transformed marker intensity
-scale. This vector must have the same number of values as \code{intensityColors} (default: c(0,5))}
+scale. This vector must have the same number of values as \code{intensityColors} (default: c(0,2,4,6))}
 
 \item{intensityColors}{A vector of strings indicating the colors used to represent the transformed marker intensity
-value range. This vector must have the same number of values as \code{intensityBreaks} (default: c("#440154FF", "#FDE725FF"))}
+value range. This vector must have the same number of values as \code{intensityBreaks}
+(default: c("#4A0E53", "#925F54", "#D6B343", "#FDE727"))}
 
 \item{columnDendHeight}{A numeric indicating the row dendrogram width (in mm)
 for the Z score cluster phenotypes heatmap (default: 10)}
