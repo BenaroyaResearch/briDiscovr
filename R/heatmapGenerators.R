@@ -7,16 +7,27 @@
 #' @param experiment A discovrExperiment created using \code{setupDiscovrExperiment},
 #' clustered using \code{clusterDiscovrExperiment}, and metaclustered with
 #' \code{metaclusterDiscovrExperiment}
-#' @param parentSubset A string indicating which subset represents the parent population (eg: all CD8+ cells).
-#' If this is left NA, then it's assumed the first subset listed in the experiment's fcsInfo file is the parent
-#' population and all other subsets are rare populations. (default: NA)
 #' @param childSubsets A vector of strings indicating which subsets represent rare populations (eg: Tmr+ cells).
-#' If this is left NA, then it's assumed the first subset listed in the experiment's fcsInfo file is the parent
-#' population and all other subsets are rare populations. (default: NA)
+#' If this is left NA, then it's assumed all non-parent subsets are rare populations. (default: NA)
 #' @param filenamePrefix A string indicating the prefix to use for each file that gets saved.
 #' This can include a directory path. If left as NA, will use the current date as the prefix
 #' with the format YYMMDD. (default: NA)
 #' @param parentTitle A string to use to label the parent population heatmaps (default: "Parent")
+#' @param metaclusterColors An optional vector of color values to use to label metaclusters in heatmaps.
+#' If left as the default 'NA', a random list of visually distinct colors will be generated.
+#' Note that if a color vector is supplied, it must contain at least as many colors as there are metaclusters. (default: NA)
+#' @param zScoreBreaks A vector of numbers indicating the values used to calibrate the Z score color scale. This vector
+#' must have the same number of values as \code{zScoreColors}. (default: c(-2,0,2))
+#' @param zScoreColors A vector of strings indicating the colors used to represent the Z score value range. This vector
+#' must have the same number of values as \code{zScoreBreaks}. (default: c("#00ffffFF", "#000000FF", "#FDE725FF"))
+#' @param intensityBreaks A vector of numbers indicating the values used to calibrate the transformed marker intensity
+#' scale. This vector must have the same number of values as \code{intensityColors} (default: c(0,5))
+#' @param intensityColors A vector of strings indicating the colors used to represent the transformed marker intensity
+#' value range. This vector must have the same number of values as \code{intensityBreaks} (default: c("#440154FF", "#FDE725FF"))
+#' @param columnDendHeight A numeric indicating the column dendrogram height (in mm)
+#' for the Z score cluster phenotypes heatmap (default: 10)
+#' @param columnDendHeight A numeric indicating the row dendrogram width (in mm)
+#' for the Z score cluster phenotypes heatmap (default: 10)
 #' @param verbose A boolean specifying whether to display processing messages (default: TRUE)
 #' @return An S3 object of class \code{discovrExperiment}
 #'
@@ -28,15 +39,20 @@
 #' @importFrom rlang .data
 #' @importFrom grDevices colorRampPalette dev.off png
 #' @importFrom grid unit
-#' @importFrom RColorBrewer brewer.pal
 #' @importFrom circlize colorRamp2
 #' @export
 makeMetaclusterHeatmaps <- function(
   experiment,
-  parentSubset = NA,
   childSubsets = NA,
   filenamePrefix = NA,
   parentTitle = "Parent",
+  metaclusterColors = NA,
+  zScoreBreaks = c(-2,0,2),
+  zScoreColors = c("#00ffffFF", "#000000FF", "#FDE725FF"),
+  intensityBreaks = c(0,5),
+  intensityColors = c("#440154FF", "#FDE725FF"),
+  columnDendHeight = 10,
+  rowDendWidth = 10,
   verbose = TRUE
 ){
   # check for experiment data object
@@ -64,17 +80,14 @@ makeMetaclusterHeatmaps <- function(
   # Check requested subsets
   subsets <- unique(experiment$fcsInfo$cellSubset)
 
-  if(is.na(parentSubset)){
-    message("No parent population specified. Assumuning parent population is: ", subsets[1])
-    parentSubset <- subsets[1]
-  }
+  parentSubset <- experiment$parentPopulation
 
   if(is.na(childSubsets)){
+    childSubsets <- subsets[subsets != parentSubset]
     message(
       "No child populations specified. Assuming child populations are: ",
-      paste0(subsets[2:length(subsets)], collapse = "; ")
+      paste0(childSubsets, collapse = "; ")
     )
-    childSubsets <- subsets[2:length(subsets)]
   }
 
   if(!parentSubset %in% subsets){
@@ -97,7 +110,15 @@ makeMetaclusterHeatmaps <- function(
     filenamePrefix <- format(Sys.Date(), "%y%m%d-")
   }
 
-  # TODO: check color palettes
+  # Set up color palettes
+  if(all(is.na(metaclusterColors))){
+    metaclusterColors = getColorList(experiment$kGroups)
+  }
+  if (length(metaclusterColors) != experiment$kGroups){
+    stop("The length of 'metaclusterColors' must be the same as the number of metaclusters. ",
+         length(metaclusterColors), " colors were provided for ", experiment$kGroups, " metaclusters.")
+  }
+
   # TODO: make arguments to set new pals easily
   ### ln 225-250
 
@@ -108,15 +129,29 @@ makeMetaclusterHeatmaps <- function(
   titleFontParam = grid::gpar(fontface = "bold", fontsize = 15)
   marker_label_gp = grid::gpar(fontsize = 13)
 
-  # Set up a palette for the heatmap
-  my_zscore_pal <- circlize::colorRamp2(c(-2,0,2), c("#00ffffFF", "#000000FF", "#FDE725FF"))
-  my_arcsinh_pal <- circlize::colorRamp2(c(0,5), c("#440154FF", "#FDE725FF"))
+  # Set up palettes for the heatmap
+  if(length(zScoreBreaks) != length(zScoreColors)){
+    stop("zScoreBreaks and zScoreColors must be the same length.")
+  }
+  if(length(intensityBreaks) != length(intensityColors)){
+    stop("intensityBreaks and intensityColors must be the same length.")
+  }
+  my_zscore_pal <- circlize::colorRamp2(
+    breaks = zScoreBreaks,
+    colors = zScoreColors
+  )
+  my_arcsinh_pal <- circlize::colorRamp2(
+    breaks = intensityBreaks,
+    colors = intensityColors
+  )
+
 
   # get subject ids, assign colors to them
   subject_ids <- sort(unique(experiment$clusterRarePopCts$samp))
-  subject_id_colors <- data.frame(subject = subject_ids,
-                                  color = c("#000000FF",
-                                            viridisLite::plasma(length(subject_ids)+2)[4:(length(subject_ids)+2)]))
+  subject_id_colors <- data.frame(
+    subject = subject_ids,
+    color = c("#000000FF",  viridisLite::plasma(length(subject_ids)+2)[4:(length(subject_ids)+2)])
+    )
 
 
 
@@ -151,7 +186,7 @@ makeMetaclusterHeatmaps <- function(
       ),
       # for 1-12MCs
       group = setNames(
-        RColorBrewer::brewer.pal(experiment$kGroups, "Set3"),
+        metaclusterColors,
         as.character(unique(experiment$colIndices))
       )
     )
@@ -190,14 +225,18 @@ makeMetaclusterHeatmaps <- function(
     experiment$allSubsetAllSubjectZscores,
     col = my_zscore_pal,
     name = "z-score",
-    column_title = paste0("Cluster Phenotypes from All Subjects"),
+    # column styling
+    column_title = paste0("Cluster Phenotypes from All Samples"),
     column_title_gp = titleFontParam,
-    #column_dend_height=unit(10,"cm"),
+    column_dend_height=unit(columnDendHeight, "mm"),
     clustering_method_columns = experiment$linkage,
-    cluster_rows = T,
+    show_column_names = FALSE,
+    # row styling
+    cluster_rows = TRUE,
     clustering_method_rows = experiment$linkage,
-    show_column_names = F,
+    row_dend_width=unit(rowDendWidth, "mm"),
     row_names_gp = marker_label_gp,
+    # overall styling
     top_annotation = allSubsetZscoreAnno,
     heatmap_legend_param = legendParams
   )
@@ -205,7 +244,7 @@ makeMetaclusterHeatmaps <- function(
   png(
     filename = paste0(
       filenamePrefix, "_", experiment$linkage, "_", experiment$distance, "_",
-      "_AllClusters_cutree", experiment$nMetaclusters, "_pct_Islet.png"
+      "_allClusters_cutree", experiment$nMetaclusters, "_zScore.png"
     ),
     width = exportWidth,
     height = exportHeight
@@ -219,7 +258,7 @@ makeMetaclusterHeatmaps <- function(
   png(
     filename = paste0(
       filenamePrefix, "_", experiment$linkage, "_", experiment$distance, "_",
-      "_AllClusters_cutree", experiment$nMetaclusters, "_pct_tmrs_MFI.png"
+      "_allClusters_cutree", experiment$nMetaclusters, "_MFI.png"
     ),
     width = exportWidth,
     height = exportHeight
@@ -228,7 +267,7 @@ makeMetaclusterHeatmaps <- function(
     experiment$allSubsetAllSubjectArcsinh,
     col = my_arcsinh_pal,
     name = "MFI",
-    column_title = paste0("Cluster Phenotypes from All Subjects"),
+    column_title = paste0("Cluster Phenotypes from All Samples"),
     column_title_gp = titleFontParam,
     cluster_columns = F,
     column_order = ComplexHeatmap::column_order(zscore_hmap),
@@ -284,7 +323,7 @@ makeMetaclusterHeatmaps <- function(
   tmr_avg_anno_colors <- list(
     #1-12MCs
     group = setNames(
-      RColorBrewer::brewer.pal(experiment$kGroups, "Set3"),
+      metaclusterColors,
       as.character(colnames(perMetaclusterAvg))
     )
   )
