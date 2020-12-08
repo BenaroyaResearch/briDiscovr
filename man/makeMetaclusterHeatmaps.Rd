@@ -6,10 +6,16 @@
 \usage{
 makeMetaclusterHeatmaps(
   experiment,
-  parentSubset = NA,
   childSubsets = NA,
   filenamePrefix = NA,
   parentTitle = "Parent",
+  metaclusterColors = NA,
+  zScoreBreaks = c(-2, 0, 2),
+  zScoreColors = c("#00ffffFF", "#000000FF", "#FDE725FF"),
+  intensityBreaks = c(0, 5),
+  intensityColors = c("#440154FF", "#FDE725FF"),
+  columnDendHeight = 10,
+  rowDendWidth = 10,
   verbose = TRUE
 )
 }
@@ -18,19 +24,33 @@ makeMetaclusterHeatmaps(
 clustered using \code{clusterDiscovrExperiment}, and metaclustered with
 \code{metaclusterDiscovrExperiment}}
 
-\item{parentSubset}{A string indicating which subset represents the parent population (eg: all CD8+ cells).
-If this is left NA, then it's assumed the first subset listed in the experiment's fcsInfo file is the parent
-population and all other subsets are rare populations. (default: NA)}
-
 \item{childSubsets}{A vector of strings indicating which subsets represent rare populations (eg: Tmr+ cells).
-If this is left NA, then it's assumed the first subset listed in the experiment's fcsInfo file is the parent
-population and all other subsets are rare populations. (default: NA)}
+If this is left NA, then it's assumed all non-parent subsets are rare populations. (default: NA)}
 
 \item{filenamePrefix}{A string indicating the prefix to use for each file that gets saved.
 This can include a directory path. If left as NA, will use the current date as the prefix
 with the format YYMMDD. (default: NA)}
 
 \item{parentTitle}{A string to use to label the parent population heatmaps (default: "Parent")}
+
+\item{metaclusterColors}{An optional vector of color values to use to label metaclusters in heatmaps.
+If left as the default 'NA', a random list of visually distinct colors will be generated.
+Note that if a color vector is supplied, it must contain at least as many colors as there are metaclusters. (default: NA)}
+
+\item{zScoreBreaks}{A vector of numbers indicating the values used to calibrate the Z score color scale. This vector
+must have the same number of values as \code{zScoreColors}. (default: c(-2,0,2))}
+
+\item{zScoreColors}{A vector of strings indicating the colors used to represent the Z score value range. This vector
+must have the same number of values as \code{zScoreBreaks}. (default: c("#00ffffFF", "#000000FF", "#FDE725FF"))}
+
+\item{intensityBreaks}{A vector of numbers indicating the values used to calibrate the transformed marker intensity
+scale. This vector must have the same number of values as \code{intensityColors} (default: c(0,5))}
+
+\item{intensityColors}{A vector of strings indicating the colors used to represent the transformed marker intensity
+value range. This vector must have the same number of values as \code{intensityBreaks} (default: c("#440154FF", "#FDE725FF"))}
+
+\item{columnDendHeight}{A numeric indicating the row dendrogram width (in mm)
+for the Z score cluster phenotypes heatmap (default: 10)}
 
 \item{verbose}{A boolean specifying whether to display processing messages (default: TRUE)}
 }
