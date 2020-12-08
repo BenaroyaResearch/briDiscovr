@@ -14,3 +14,22 @@ buildFcsList <- function(fileFrame, indexField = "subject", ...) {
   }
   return(tmpList)
 }
+
+# Private function to generate a list of colors of arbitrary length.
+getColorList <- function(n, seed = 42){
+  set.seed(seed)
+  qualColorPals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
+  allColors = unlist(mapply(RColorBrewer::brewer.pal, qualColorPals$maxcolors, rownames(qualColorPals)))
+
+  retList = c()
+
+  if (n > length(allColors)){
+    message("Note: ", n, " colors requested, ", length(allColors), " unique colors available. Some colors will be repeated.")
+    while(n > length(allColors)){
+      retList = c(retList, sample(allColors))
+      n = n - length(allColors)
+    }
+  }
+  retList = c(retList, sample(allColors)[1:n])
+  return(retList)
+}
