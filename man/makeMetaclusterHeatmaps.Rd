@@ -50,7 +50,10 @@ scale. This vector must have the same number of values as \code{intensityColors}
 value range. This vector must have the same number of values as \code{intensityBreaks}
 (default: c("#4A0E53", "#925F54", "#D6B343", "#FDE727"))}
 
-\item{columnDendHeight}{A numeric indicating the row dendrogram width (in mm)
+\item{columnDendHeight}{A numeric indicating the column dendrogram height (in mm)
+for the Z score cluster phenotypes heatmap (default: 10)}
+
+\item{rowDendWidth}{A numeric indicating the row dendrogram width (in mm)
 for the Z score cluster phenotypes heatmap (default: 10)}
 
 \item{verbose}{A boolean specifying whether to display processing messages (default: TRUE)}

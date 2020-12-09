@@ -27,7 +27,7 @@
 #' (default: c("#4A0E53", "#925F54", "#D6B343", "#FDE727"))
 #' @param columnDendHeight A numeric indicating the column dendrogram height (in mm)
 #' for the Z score cluster phenotypes heatmap (default: 10)
-#' @param columnDendHeight A numeric indicating the row dendrogram width (in mm)
+#' @param rowDendWidth A numeric indicating the row dendrogram width (in mm)
 #' for the Z score cluster phenotypes heatmap (default: 10)
 #' @param verbose A boolean specifying whether to display processing messages (default: TRUE)
 #' @return An S3 object of class \code{discovrExperiment}
@@ -207,7 +207,6 @@ makeMetaclusterHeatmaps <- function(
     dplyr::mutate(subject = str_replace(.data$sample, "_[0-9]+$", "")) %>%
     dplyr::select(.data$subject, .data$group, !!childSubsets)
 
-
   # TODO: add an argument to facilitate more annotations
   # TODO: add an argument for a palette for each additional anno
   # %>%
@@ -226,10 +225,6 @@ makeMetaclusterHeatmaps <- function(
         as.character(unique(experiment$colIndices))
       )
     )
-  #group = setNames(c(brewer.pal(12, "Set3"), brewer.pal(kGroups-12, "Set2")), #for 12-20MCs
-  #         as.character(unique(colIndices)))) #,
-  # group = setNames(viridis(kGroups),
-  #          as.character(unique(colIndices)))) # original viridis scheme
 
   # add metacluster information to tmr counting information
   subsetEventCounting <- left_join(
@@ -258,7 +253,7 @@ makeMetaclusterHeatmaps <- function(
   # show_legend = c(F, T, T, T, T))
 
   zscore_hmap <- ComplexHeatmap::Heatmap(
-    experiment$allSubsetAllSubjectZscores,
+    experiment$allSubsetAllSubjectZscores[experiment$clusteringMarkers,],
     col = my_zscore_pal,
     name = "z-score",
     # column styling
@@ -288,7 +283,13 @@ makeMetaclusterHeatmaps <- function(
   print(zscore_hmap)
   dev.off()
 
-  marker_order = ComplexHeatmap::row_order(zscore_hmap)
+  # set marker order, and include any non-clustering markers at the bottom
+  markerOrderIndices = ComplexHeatmap::row_order(zscore_hmap)
+  zscoreRownames = rownames(experiment$allSubsetAllSubjectZscores[experiment$clusteringMarkers,])
+  markerOrder = c(
+    zscoreRownames[markerOrderIndices],
+    setdiff(experiment$metaclusterMarkers, experiment$clusteringMarkers)
+  )
 
   #MFI plot
   png(
@@ -308,8 +309,7 @@ makeMetaclusterHeatmaps <- function(
     cluster_columns = F,
     column_order = ComplexHeatmap::column_order(zscore_hmap),
     cluster_rows = F,
-    row_order = experiment$metaclusterMarkers[marker_order],
-    #split = rep(c("", " "), c(length(marker_order), 2)),
+    row_order = markerOrder,
     gap = unit(5, "mm"),
     show_column_names = F,
     row_names_gp = marker_label_gp,
@@ -379,8 +379,7 @@ makeMetaclusterHeatmaps <- function(
     column_title_gp = titleFontParam,
     cluster_columns = F,
     cluster_rows = F,
-    row_order = experiment$metaclusterMarkers[marker_order],
-    #split = rep(c("", " "), c(length(marker_order), 2)),
+    row_order = markerOrder,
     gap = unit(5, "mm"),
     #combined_name_fun = NULL,
     show_column_names = F,
@@ -444,7 +443,7 @@ makeMetaclusterHeatmaps <- function(
     column_title_gp = titleFontParam,
     cluster_columns = F,
     cluster_rows = F,
-    row_order = experiment$metaclusterMarkers[marker_order],
+    row_order = markerOrder,
     #split = rep(c("", " "), c(length(marker_order), 2)),
     gap = unit(5, "mm"),
     #combined_name_fun = NULL,
