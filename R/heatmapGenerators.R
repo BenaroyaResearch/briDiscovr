@@ -9,6 +9,11 @@
 #' \code{metaclusterDiscovrExperiment}
 #' @param childSubsets A vector of strings indicating which subsets represent rare populations (eg: Tmr+ cells).
 #' If this is left NA, then it's assumed all non-parent subsets are rare populations. (default: NA)
+#' @param dropMarkers A string or vector of strings indicating names of markers to exclude
+#' from display. Note that printing the experiment object will display a list of all
+#' markers. By default all markers will be included. Markers not used in metaclustering will be shown in
+#' a separate heatmap. Also note that you cannot drop markers that were used in metaclustering, and should instead
+#' re-run the metclustering step, dropping the markers at that stage. (default: NA)
 #' @param filenamePrefix A string indicating the prefix to use for each file that gets saved.
 #' This can include a directory path. If left as NA, will use the current date as the prefix
 #' with the format YYMMDD. (default: NA)
@@ -45,6 +50,7 @@
 makeMetaclusterHeatmaps <- function(
   experiment,
   childSubsets = NA,
+  dropMarkers = NA,
   filenamePrefix = NA,
   parentTitle = "Parent",
   metaclusterColors = NA,
@@ -76,6 +82,24 @@ makeMetaclusterHeatmaps <- function(
       "The object does not have the data expected in a metaclustered experiment. ",
       "Please re-run the clustering and metaclustering steps and try again."
     )
+  }
+
+  # Check marker names
+  if(!all(is.na(dropMarkers))){
+    if (!all(dropMarkers %in% experiment$markerInfo$commonMarkerName)){
+      stop(
+        "The following markers were not found in the dataset: ",
+        paste0(dropMarkers[!dropMarkers %in% experiment$markerInfo$commonMarkerName], collapse = ", "),
+        ". Please remove these markers from the 'dropMarkers' argument."
+      )
+    }
+    if (any(dropMarkers %in% experiment$metaclusterMarkers)){
+      stop(
+        "The markers ", dropMarkers[dropMarkers %in% experiment$metaclusterMarkers],
+        " were listed in 'dropMarkers' but were used for metaclustering and cannot be dropped. ",
+        "Please re-run metaclustering without these markers to remove them."
+      )
+    }
   }
 
   # Check requested subsets
@@ -110,6 +134,13 @@ makeMetaclusterHeatmaps <- function(
   if(is.na(filenamePrefix)){
     filenamePrefix <- format(Sys.Date(), "%y%m%d-")
   }
+  filenamePrefix = paste0(
+    filenamePrefix,
+    experiment$linkage, "_",
+    experiment$distance, "_",
+    experiment$pctInClusterThreshold, "pctThresh_",
+    experiment$nMetaclusters, "metaclusters"
+  )
 
   # Set up color palettes
   if(all(is.na(metaclusterColors))){
@@ -122,7 +153,7 @@ makeMetaclusterHeatmaps <- function(
 
   ### ln 225-250
 
-  # blank out the legend titles by setting params to an empty list
+  # Display Parameters
   exportWidth = 900
   exportHeight = 900
   titleFontParam = grid::gpar(fontface = "bold", fontsize = 15)
@@ -205,7 +236,7 @@ makeMetaclusterHeatmaps <- function(
       by = "sample"
     ) %>%
     dplyr::mutate(subject = str_replace(.data$sample, "_[0-9]+$", "")) %>%
-    dplyr::select(.data$subject, .data$group, !!childSubsets)
+    dplyr::select(.data$subject, .data$group,  parentSubset, !!childSubsets)
 
   # TODO: add an argument to facilitate more annotations
   # TODO: add an argument for a palette for each additional anno
@@ -219,7 +250,7 @@ makeMetaclusterHeatmaps <- function(
         subject_id_colors$color,
         as.character(subject_id_colors$subject)
       ),
-      # for 1-12MCs
+      # assign metacluster names to colors
       group = setNames(
         metaclusterColors,
         as.character(unique(experiment$colIndices))
@@ -236,9 +267,11 @@ makeMetaclusterHeatmaps <- function(
   )
 
   ## Use for pct rare subset color scheme
-  for (t in childSubsets){
-    allSubsetZscoreAnnoColors[[t]] = c(setNames("white", 0),
-                                        setNames(colorRampPalette(c("grey95", "grey0"))(100), seq(0.01, 1.00, 0.01)))
+  for (t in c(parentSubset, childSubsets)){
+    allSubsetZscoreAnnoColors[[t]] = c(
+      setNames("white", 0),
+      setNames(colorRampPalette(c("grey95", "grey0"))(100), seq(0.01, 1.00, 0.01))
+    )
   }
 
   allSubsetZscoreAnno <-
@@ -253,7 +286,7 @@ makeMetaclusterHeatmaps <- function(
   # show_legend = c(F, T, T, T, T))
 
   zscore_hmap <- ComplexHeatmap::Heatmap(
-    experiment$allSubsetAllSubjectZscores[experiment$clusteringMarkers,],
+    experiment$allSubsetAllSubjectZscores[experiment$metaclusterMarkers,],
     col = my_zscore_pal,
     name = "z-score",
     # column styling
@@ -272,36 +305,33 @@ makeMetaclusterHeatmaps <- function(
     heatmap_legend_param = zScoreLegendParam
   )
 
+  # write the primary z-score heatmap to a file
   png(
-    filename = paste0(
-      filenamePrefix, "_", experiment$linkage, "_", experiment$distance, "_",
-      "_allClusters_cutree", experiment$nMetaclusters, "_zScore.png"
-    ),
+    filename = paste0(filenamePrefix, "_allClusters_zScore.png"),
     width = exportWidth,
     height = exportHeight
   )
   print(zscore_hmap)
   dev.off()
 
-  # set marker order, and include any non-clustering markers at the bottom
+  #################################################################################
+  # set marker order for other plots based on the z-score heatmap,
+  # and identify any non-clustering markers to show in detached heatmaps
   markerOrderIndices = ComplexHeatmap::row_order(zscore_hmap)
-  zscoreRownames = rownames(experiment$allSubsetAllSubjectZscores[experiment$clusteringMarkers,])
-  markerOrder = c(
-    zscoreRownames[markerOrderIndices],
-    setdiff(experiment$metaclusterMarkers, experiment$clusteringMarkers)
-  )
+  zscoreRownames = rownames(experiment$allSubsetAllSubjectZscores[experiment$metaclusterMarkers,])
+  markerOrder = zscoreRownames[markerOrderIndices]
 
-  #MFI plot
+  additionalMarkers = setdiff(experiment$hmapDfAllSubsets$marker, experiment$metaclusterMarkers)
+  additionalMarkers = setdiff(additionalMarkers, dropMarkers)
+
+  # MFI plot - metaclustered markers
   png(
-    filename = paste0(
-      filenamePrefix, "_", experiment$linkage, "_", experiment$distance, "_",
-      "_allClusters_cutree", experiment$nMetaclusters, "_MFI.png"
-    ),
+    filename = paste0(filenamePrefix,"_allClusters_metacluster_MFI.png"),
     width = exportWidth,
     height = exportHeight
   )
   print(ComplexHeatmap::Heatmap(
-    experiment$allSubsetAllSubjectArcsinh,
+    experiment$allSubsetAllSubjectArcsinh[markerOrder,],
     col = my_arcsinh_pal,
     name = "MFI",
     column_title = paste0("Cluster Phenotypes from All Samples"),
@@ -317,7 +347,6 @@ makeMetaclusterHeatmaps <- function(
     heatmap_legend_param = intensityLegendParam)
   )
   dev.off()
-
 
   # Weighted Average phenotype hmap - average of arcsinch values in each metacluster
   perMetaclusterAvg <-
@@ -370,18 +399,17 @@ makeMetaclusterHeatmaps <- function(
                                     show_legend = T)
 
 
-  #Did not work Error in .local(object, ...) : Number of rows in the matrix are not the same as the length of the cluster or the row orders.
+  # Metacluster average heatmap - metaclustering markers
   tmr_hm <- ComplexHeatmap::Heatmap(
-    perMetaclusterAvg,
+    perMetaclusterAvg[markerOrder,],
     col = my_arcsinh_pal,
     name = "MFI",
-    column_title = paste0("Clusters Enriched for ", experiment$nMetaclusters, " Tmrs"),
+    column_title = paste(experiment$nMetaclusters, "Metaclusters - Weighted Average MFI"),
     column_title_gp = titleFontParam,
     cluster_columns = F,
     cluster_rows = F,
     row_order = markerOrder,
     gap = unit(5, "mm"),
-    #combined_name_fun = NULL,
     show_column_names = F,
     row_names_gp = marker_label_gp,
     top_annotation = tmr_avg_anno,
@@ -390,15 +418,15 @@ makeMetaclusterHeatmaps <- function(
 
 
   png(
-    filename = paste0(
-      filenamePrefix, "_", experiment$linkage, "_rpheno_", experiment$nMetaclusters, "_arcsinh_weightedAvgByClust.png"
-    ),
+    filename = paste0(filenamePrefix, "_metaclusters_arcsinh_weightedAvgByClust.png"),
     width = 2500,
     height = 2500,
     res = 300
   )
   print(tmr_hm)
   dev.off()
+
+
 
   ## Weighted Average phenotype for total CD8s
   # weighted by proportion of cells in a subject (not by number of cells) in order to allow
@@ -434,9 +462,9 @@ makeMetaclusterHeatmaps <- function(
 
   colnames(parentPopulationAvg) = parentTitle
 
-  #Did not work
+  # Total Marker Average - metaclustering markers
   parentWeightedAvgHeatmap <- ComplexHeatmap::Heatmap(
-    parentPopulationAvg,
+    parentPopulationAvg[markerOrder,],
     col = my_arcsinh_pal,
     name = "MFI",
     column_title = paste0("Total ", parentTitle),
@@ -444,20 +472,98 @@ makeMetaclusterHeatmaps <- function(
     cluster_columns = F,
     cluster_rows = F,
     row_order = markerOrder,
-    #split = rep(c("", " "), c(length(marker_order), 2)),
     gap = unit(5, "mm"),
-    #combined_name_fun = NULL,
     show_column_names = F,
     row_names_gp = marker_label_gp,
     heatmap_legend_param = intensityLegendParam
   )
 
-  png(filename = paste0(filenamePrefix, "_", experiment$linkage, "_", parentTitle, "_arcsinh_weightedAvg.png"),
+  png(filename = paste0(filenamePrefix, "_total", parentTitle, "_arcsinh_weightedAvg.png"),
       width = 700,
       height = 2500,
       res = 300)
   print(parentWeightedAvgHeatmap)
   dev.off()
+
+
+  # if there are additional markers to make plots for, do so
+  if(!all(is.na(additionalMarkers)) && length(additionalMarkers) > 0){
+    # MFI plot - additional markers
+    png(
+      filename = paste0(filenamePrefix, "_allClusters_nonClusteringMarkers_MFI.png"),
+      width = exportWidth,
+      height = exportHeight * (length(additionalMarkers)/length(markerOrder))
+    )
+    print(ComplexHeatmap::Heatmap(
+      experiment$allSubsetAllSubjectArcsinh[additionalMarkers,, drop=FALSE],
+      col = my_arcsinh_pal,
+      name = "MFI",
+      column_title = paste0("Cluster Phenotypes from All Samples (Non-Clustering Markers)"),
+      column_title_gp = titleFontParam,
+      cluster_columns = F,
+      column_order = ComplexHeatmap::column_order(zscore_hmap),
+      cluster_rows = F,
+      row_order = additionalMarkers,
+      gap = unit(5, "mm"),
+      show_column_names = F,
+      row_names_gp = marker_label_gp,
+      top_annotation = allSubsetZscoreAnno,
+      heatmap_legend_param = intensityLegendParam)
+    )
+    dev.off()
+
+    # Total Marker Average - additional markers
+    parentWeightedAvgHeatmap <- ComplexHeatmap::Heatmap(
+      parentPopulationAvg[additionalMarkers,, drop=FALSE],
+      col = my_arcsinh_pal,
+      name = "MFI",
+      column_title = paste0("Total ", parentTitle, "\n(Non-Clustering Markers)"),
+      column_title_gp = titleFontParam,
+      cluster_columns = F,
+      cluster_rows = F,
+      row_order = additionalMarkers,
+      gap = unit(5, "mm"),
+      show_column_names = F,
+      row_names_gp = marker_label_gp,
+      heatmap_legend_param = intensityLegendParam
+    )
+
+    png(
+      filename = paste0(filenamePrefix, "_total", parentTitle, "_nonClusteringMarkers_arcsinh_weightedAvg.png"),
+      width = 700,
+      height = 2500 * (length(additionalMarkers)/length(markerOrder)),
+      res = 300
+    )
+    print(parentWeightedAvgHeatmap)
+    dev.off()
+
+    # Metacluster average heatmap - additional markers
+    tmr_hm <- ComplexHeatmap::Heatmap(
+      perMetaclusterAvg[additionalMarkers,, drop=FALSE],
+      col = my_arcsinh_pal,
+      name = "MFI",
+      column_title = paste(experiment$nMetaclusters, "Metaclusters - Weighted Average MFI (Non-Clustering Markers)"),
+      column_title_gp = titleFontParam,
+      cluster_columns = F,
+      cluster_rows = F,
+      row_order = additionalMarkers,
+      gap = unit(5, "mm"),
+      show_column_names = F,
+      row_names_gp = marker_label_gp,
+      top_annotation = tmr_avg_anno,
+      heatmap_legend_param = intensityLegendParam
+    )
+
+    png(
+      filename = paste0(filenamePrefix, "_nonClusteringMarkers_arcsinh_weightedAvgByClust.png"),
+      width = 2500,
+      height = 2500 * (length(additionalMarkers)/length(markerOrder)),
+      res = 300
+    )
+    print(tmr_hm)
+    dev.off()
+  }
+
 
   #########################################################################
   # Section 3.e from original SOP - export data
