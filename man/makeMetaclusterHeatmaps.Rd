@@ -7,6 +7,7 @@
 makeMetaclusterHeatmaps(
   experiment,
   childSubsets = NA,
+  dropMarkers = NA,
   filenamePrefix = NA,
   parentTitle = "Parent",
   metaclusterColors = NA,
@@ -26,6 +27,12 @@ clustered using \code{clusterDiscovrExperiment}, and metaclustered with
 
 \item{childSubsets}{A vector of strings indicating which subsets represent rare populations (eg: Tmr+ cells).
 If this is left NA, then it's assumed all non-parent subsets are rare populations. (default: NA)}
+
+\item{dropMarkers}{A string or vector of strings indicating names of markers to exclude
+from display. Note that printing the experiment object will display a list of all
+markers. By default all markers will be included. Markers not used in metaclustering will be shown in
+a separate heatmap. Also note that you cannot drop markers that were used in metaclustering, and should instead
+re-run the metclustering step, dropping the markers at that stage. (default: NA)}
 
 \item{filenamePrefix}{A string indicating the prefix to use for each file that gets saved.
 This can include a directory path. If left as NA, will use the current date as the prefix
