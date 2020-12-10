@@ -129,9 +129,9 @@ metaclusterDiscovrExperiment <- function(
   #########################################################################
   ##### lines 257-299 - not mentioned in SOP, but sets up data for next section
 
-  # drop any markers that won't be used in metaclustering or plotting
+  # get list of all markers and drop any markers that won't be used in metaclustering
   markers <- experiment$markerInfo$commonMarkerName
-  markers <- markers[!markers %in% dropMarkers]
+  metaclusterMarkers <- experiment$clusteringMarkers[!experiment$clusteringMarkers %in% dropMarkers]
 
   # prepare data for each subset (ie: tmr)
   subsets <- unique(experiment$fcsInfo$cellSubset)
@@ -208,7 +208,7 @@ metaclusterDiscovrExperiment <- function(
 
   # use ComplexHeatmap as a convenient way of applying metaclustering
   metaxHeatmap <- ComplexHeatmap::Heatmap(
-    allSubsetAllSubjectZscores,
+    allSubsetAllSubjectZscores[metaclusterMarkers,],
     clustering_method_columns = linkage,
     clustering_distance_columns = distance,
     clustering_method_rows = linkage,
@@ -259,10 +259,11 @@ metaclusterDiscovrExperiment <- function(
   experiment$dfAllSubsets                 <- dfAllSubsets
   experiment$clustSigPass                 <- clustSigPass
   experiment$hmapDfAllSubsets             <- hmapDfAllSubsets
+  experiment$pctInClusterThreshold        <- pctInClusterThreshold
   experiment$allSubsetAllSubjectZscores   <- allSubsetAllSubjectZscores
   experiment$allSubsetAllSubjectArcsinh   <- allSubsetAllSubjectArcsinh
   experiment$subsetEventCounting          <- subsetEventCounting
-  experiment$metaclusterMarkers           <- markers
+  experiment$metaclusterMarkers           <- metaclusterMarkers
   experiment$nMetaclusters                <- nMetaclusters
   experiment$metaclusterOccupancy         <- metaclusterOccupancy
   experiment$colIndices                   <- colIndices
