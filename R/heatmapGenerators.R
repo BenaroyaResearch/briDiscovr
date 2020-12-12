@@ -386,11 +386,32 @@ makeMetaclusterHeatmaps <- function(
 
   # set up colors as a named list
   tmr_avg_anno_colors <- list(
-    #1-12MCs
     group = setNames(
       metaclusterColors,
       as.character(colnames(perMetaclusterAvg))
     )
+  )
+
+  # set up color scale legend
+  avgIntensityMaxLabel = ifelse(
+    max(intensityBreaks) < max(perMetaclusterAvg),
+    paste0("> ", max(intensityBreaks)),
+    max(intensityBreaks)
+  )
+  avgIntensityMinLabel = ifelse(
+    min(intensityBreaks) > min(perMetaclusterAvg),
+    paste0("< ", min(intensityBreaks)),
+    min(intensityBreaks)
+  )
+  avgIntensityBreaks = sort(intensityBreaks)
+
+  avgIntensityBreakLabels = avgIntensityBreaks
+  avgIntensityBreakLabels[1] = avgIntensityMinLabel
+  avgIntensityBreakLabels[length(avgIntensityBreakLabels)] = avgIntensityMaxLabel
+
+  avgIntensityLegendParam = list(
+    at = avgIntensityBreaks,
+    labels = avgIntensityBreakLabels
   )
 
   tmr_avg_anno <- ComplexHeatmap::HeatmapAnnotation(df = tmr_avg_anno_df,
@@ -413,7 +434,7 @@ makeMetaclusterHeatmaps <- function(
     show_column_names = F,
     row_names_gp = marker_label_gp,
     top_annotation = tmr_avg_anno,
-    heatmap_legend_param = intensityLegendParam
+    heatmap_legend_param = avgIntensityLegendParam
   )
 
 
@@ -462,6 +483,8 @@ makeMetaclusterHeatmaps <- function(
 
   colnames(parentPopulationAvg) = parentTitle
 
+
+
   # Total Marker Average - metaclustering markers
   parentWeightedAvgHeatmap <- ComplexHeatmap::Heatmap(
     parentPopulationAvg[markerOrder,],
@@ -475,7 +498,7 @@ makeMetaclusterHeatmaps <- function(
     gap = unit(5, "mm"),
     show_column_names = F,
     row_names_gp = marker_label_gp,
-    heatmap_legend_param = intensityLegendParam
+    heatmap_legend_param = avgIntensityLegendParam
   )
 
   png(filename = paste0(filenamePrefix, "_total", parentTitle, "_arcsinh_weightedAvg.png"),
@@ -525,7 +548,7 @@ makeMetaclusterHeatmaps <- function(
       gap = unit(5, "mm"),
       show_column_names = F,
       row_names_gp = marker_label_gp,
-      heatmap_legend_param = intensityLegendParam
+      heatmap_legend_param = avgIntensityLegendParam
     )
 
     png(
@@ -551,7 +574,7 @@ makeMetaclusterHeatmaps <- function(
       show_column_names = F,
       row_names_gp = marker_label_gp,
       top_annotation = tmr_avg_anno,
-      heatmap_legend_param = intensityLegendParam
+      heatmap_legend_param = avgIntensityLegendParam
     )
 
     png(
