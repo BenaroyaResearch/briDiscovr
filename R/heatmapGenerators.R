@@ -41,7 +41,7 @@
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
 #' @import dplyr
 #' @importFrom tibble rownames_to_column
-#' @importFrom stringr str_remove
+#' @importFrom stringr str_remove str_extract
 #' @importFrom rlang .data
 #' @importFrom grDevices colorRampPalette dev.off png
 #' @importFrom grid unit
@@ -356,15 +356,15 @@ makeMetaclusterHeatmaps <- function(
     dplyr::rowwise() %>%
     mutate(
       n_event = sum(c_across(subsets)),
-      subj = stringr::str_remove(.data$sample, "_.*"),
-      RP_clust = stringr::str_remove(.data$sample, ".*_")
+      subj = stringr::str_remove(.data$sample, "_[0-9]+$"),
+      RP_clust = stringr::str_extract(.data$sample, "[0-9]+$")
     ) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$subj) %>%
     dplyr::mutate(subj_event = sum(.data$n_event)) %>%
     dplyr::ungroup() %>%
     dplyr::mutate(proportion = .data$n_event/.data$subj_event) %>%
-    dplyr::mutate_at(experiment$metaclusterMarkers, list(~.*.data$proportion)) %>%
+    dplyr::mutate_at(experiment$markerInfo$commonMarkerName, list(~.*.data$proportion)) %>%
     dplyr::select(
       -.data$sample,
       -!!subsets,
@@ -374,7 +374,7 @@ makeMetaclusterHeatmaps <- function(
       -.data$subj_event) %>%
     dplyr::group_by(.data$group) %>%
     dplyr::summarise_all(sum) %>%
-    dplyr::mutate_at(experiment$metaclusterMarkers, list(~./.data$proportion)) %>%
+    dplyr::mutate_at(experiment$markerInfo$commonMarkerName, list(~./.data$proportion)) %>%
     dplyr::select(-.data$group, -.data$proportion) %>%
     t
 
@@ -438,15 +438,15 @@ makeMetaclusterHeatmaps <- function(
     dplyr::rowwise() %>%
     dplyr::mutate(
       n_event = sum(c_across(subsets)),
-      subj = stringr::str_remove(.data$sample, "_.*"),
-      RP_clust = stringr::str_remove(.data$sample, ".*_")
+      subj = stringr::str_remove(.data$sample, "_[0-9]+$"),
+      RP_clust = stringr::str_extract(.data$sample, "[0-9]+$")
     ) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$subj) %>%
     dplyr::mutate(subj_event = sum(.data$n_event)) %>%
     dplyr::ungroup() %>%
     dplyr::mutate(proportion = .data$n_event/.data$subj_event) %>%
-    dplyr::mutate_at(experiment$metaclusterMarkers, list(~.*.data$proportion)) %>%
+    dplyr::mutate_at(experiment$markerInfo$commonMarkerName, list(~.*.data$proportion)) %>%
     dplyr::select(
       -.data$sample,
       -!!subsets,
@@ -456,7 +456,7 @@ makeMetaclusterHeatmaps <- function(
       -.data$subj_event
     ) %>%
     dplyr::summarise_all(sum) %>%
-    dplyr::mutate_at(experiment$metaclusterMarkers, list(~./.data$proportion)) %>%
+    dplyr::mutate_at(experiment$markerInfo$commonMarkerName, list(~./.data$proportion)) %>%
     dplyr::select(-.data$proportion) %>%
     t
 
@@ -517,7 +517,7 @@ makeMetaclusterHeatmaps <- function(
       parentPopulationAvg[additionalMarkers,, drop=FALSE],
       col = my_arcsinh_pal,
       name = "MFI",
-      column_title = paste0("Total ", parentTitle, "\n(Non-Clustering Markers)"),
+      column_title = paste0("Total ", parentTitle),
       column_title_gp = titleFontParam,
       cluster_columns = F,
       cluster_rows = F,
