@@ -235,8 +235,17 @@ makeMetaclusterHeatmaps <- function(
       data.frame(group = experiment$colIndices) %>% rownames_to_column("sample"),
       by = "sample"
     ) %>%
-    dplyr::mutate(subject = str_replace(.data$sample, "_[0-9]+$", "")) %>%
-    dplyr::select(.data$subject, .data$group,  parentSubset, !!childSubsets)
+    dplyr::mutate(subject = str_replace(.data$sample, "_[0-9]+$", ""))
+
+  if(length(childSubsets > 0)){
+    allSubsetZscoreAnnoDf <-
+      dplyr::select(allSubsetZscoreAnnoDf, .data$subject, .data$group,  parentSubset, !!childSubsets)
+  } else {
+    if(verbose){message("No child subsets specified. Making plots for parent population only.")}
+    allSubsetZscoreAnnoDf <-
+      dplyr::select(allSubsetZscoreAnnoDf, .data$subject, .data$group,  parentSubset)
+  }
+
 
   # TODO: add an argument to facilitate more annotations
   # TODO: add an argument for a palette for each additional anno
