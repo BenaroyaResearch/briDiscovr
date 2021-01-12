@@ -28,6 +28,9 @@
 #' @param arcsinhC (default: 0) A numeric indicating the value for 'c' in the
 #' arcsinh data transformation equation. Should usually be 0.
 #' @param verbose (default: TRUE) A boolean specifying whether to display processing messages
+#' @param checkMemory (default: TRUE) A boolean indicating whether to check how much system memory
+#' is available before loading the dataset. If TRUE, this function will display a message and prevent
+#' data loading when the files take up more than 80% of the available system memory.
 #' @return An S3 object of class \code{discovrExperiment}
 #'
 #' @seealso \code{\link{discovrExperiment}}
@@ -37,6 +40,7 @@
 #' @importFrom methods as
 #' @importFrom stats setNames
 #' @importFrom utils read.csv
+#' @importFrom memuse Sys.meminfo mu.size
 #' @export
 setupDiscovrExperiment <- function(
   markerInfoFile,
@@ -47,7 +51,8 @@ setupDiscovrExperiment <- function(
   arcsinhA = 0,
   arcsinhB = 0.2,
   arcsinhC = 0,
-  verbose = TRUE
+  verbose = TRUE,
+  checkMemory = TRUE
 ){
   # get marker info, and check for appropriate columns
   markerInfo <- read.csv(markerInfoFile, stringsAsFactors = FALSE)
@@ -74,11 +79,14 @@ setupDiscovrExperiment <- function(
     stop("The file set as 'fcsInfoFile' must contain columns with names 'subject', 'cellSubset', and 'filename'.")
   }
 
-  # Check that fcs files can be found
+  # Check that fcs files can be found, and get size of all files
   filesThatDontExist <- c()
+  sumFileSize <- 0
   for(currFile in fcsInfo$filename){
     if(!file.exists(currFile)){
       filesThatDontExist <- c(filesThatDontExist, currFile)
+    } else {
+      sumFileSize <- sumFileSize + file.info(currFile)$size
     }
   }
   if(length(filesThatDontExist > 0)){
@@ -86,6 +94,30 @@ setupDiscovrExperiment <- function(
       "The following files could not be found:\n",
       paste0(filesThatDontExist, collapse = "\n")
     )
+  }
+
+  # Check that the files don't exceed the available system memory
+  currMem <- memuse::Sys.meminfo()
+  currSysMem <- mu.size(currMem$totalram, as.is = FALSE)
+  if(sumFileSize > currSysMem){
+    stop(
+      "Total file size of dataset (", sumFileSize,
+      " bytes) exceeds the total system memory (", currSysMem, " bytes)."
+    )
+  }
+  currFreeMem <- mu.size(currMem$freeram, as.is = FALSE)
+  if(checkMemory & (sumFileSize > 0.8*currFreeMem)){
+    stop(
+      "Total file size of dataset (", sumFileSize,
+      " bytes) exceeds 80% of the available memory (", currFreeMem, " bytes). ",
+      "To process the dataset anyway, you can set the 'checkMemory' option to FALSE, ",
+      "but be aware this may cause issues on your system if you run out of memory."
+    )
+  }
+  if(verbose){
+    message("Total system memory: ", currSysMem, " bytes")
+    message("Available system memory: ", currFreeMem, " bytes")
+    message("Size of dataset on disk: ", sumFileSize, " bytes - OK")
   }
 
   # check that the parent population is one of the subsets in the .fcs info
