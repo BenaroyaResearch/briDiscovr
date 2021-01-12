@@ -49,7 +49,7 @@ arcsinh data transformation equation. Should usually be 0.}
 
 \item{checkMemory}{(default: TRUE) A boolean indicating whether to check how much system memory
 is available before loading the dataset. If TRUE, this function will display a message and prevent
-data loading when the files take up more than 80% of the available system memory.}
+data loading when the files take up more than 80 percent of the available system memory.}
 }
 \value{
 An S3 object of class \code{discovrExperiment}
