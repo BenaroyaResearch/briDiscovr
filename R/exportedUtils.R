@@ -24,6 +24,10 @@ checkForFcsByteOffsetIssue <- function(fcsFile){
 
   headDataStartOffset <- as.integer(readChar(fileHandle, 8))
   headDataEndOffset <- as.integer(readChar(fileHandle, 8))
+
+  # check for start/end validity
+  if(!(headDataEndOffset > headDataStartOffset)){ return(FALSE) }
+
   tmpData <- readChar(fileHandle, headDataStartOffset - 42)
   close(fileHandle)
 
