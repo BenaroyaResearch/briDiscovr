@@ -65,9 +65,16 @@ setupDiscovrExperiment <- function(
   if(!all(is.logical(markerInfo$useToCluster))){
     stop("The 'useToCluster' column in the 'markerInfo' file must contain only TRUE or FALSE values.")
   }
-
   # set colnames of marker info data for consistency
   markerInfo <- dplyr::rename(markerInfo, commonMarkerName = !!markerCommonField, fcsMarkerName = !!markerFcsField)
+
+  # check for appropriate marker names
+  if(nrow(markerInfo) > length(unique(markerInfo$commonMarkerName))){
+    stop("Marker names in the ", markerCommonField, " column of the markerInfo file do not appear to be unique. Please correct this and try again.")
+  }
+  if(any(markerInfo$commonMarkerName == "")){
+    stop("Markers without assigned names were detected in the markerInfo file. Please correct the file and try again.")
+  }
 
   # extract clustering markers for convenience
   clusteringMarkers <- markerInfo[markerInfo$useToCluster, "commonMarkerName", drop = TRUE]
