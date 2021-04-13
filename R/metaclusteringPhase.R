@@ -94,12 +94,14 @@ metaclusterDiscovrExperiment <- function(
   markerStdDev <-
     experiment$mergedExpr %>%
     dplyr::select(-.data$cellSubset) %>%
+    unique() %>% # remove duplicated rows; mergedExpr has both parent and gated
     dplyr::group_by(.data$samp, .data$RPclust) %>%
     dplyr::summarise_all(sd)
 
   # Calculate parent pop standard deviations for each sample
   parentStdDev <- experiment$mergedExpr %>%
     dplyr::select(-.data$cellSubset, -.data$RPclust) %>%
+    unique() %>% # remove duplicated rows; mergedExpr has both parent and gated
     dplyr::group_by(.data$samp) %>%
     dplyr::summarise_all(sd) %>%
     dplyr::mutate(RPclust = "Total_Parent")

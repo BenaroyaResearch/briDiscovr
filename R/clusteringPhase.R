@@ -419,6 +419,7 @@ clusterDiscovrExperiment <- function(
   # Calculate mean expression value of each marker for each phenograph cluster in each subject
   clusterMeans <- experiment$mergedExpr %>%
     dplyr::select(-.data$cellSubset) %>%
+    unique() %>% # remove duplicated rows; mergedExpr has both parent and gated
     dplyr::group_by(.data$samp, .data$RPclust) %>%
     dplyr::summarise_all(mean) %>%
     dplyr::mutate(RPclust = as.character(.data$RPclust))
@@ -427,6 +428,7 @@ clusterDiscovrExperiment <- function(
   # Calculate total mean expression for each subject
   parentMeans = experiment$mergedExpr %>%
     dplyr::select(-.data$cellSubset, -.data$RPclust) %>%
+    unique() %>% # remove duplicated rows; mergedExpr has both parent and gated
     dplyr::group_by(.data$samp) %>%
     dplyr::summarise_all(mean) %>%
     dplyr::mutate(RPclust = "Total_Parent")
