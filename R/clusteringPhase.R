@@ -86,6 +86,15 @@ setupDiscovrExperiment <- function(
     stop("The file set as 'fcsInfoFile' must contain columns with names 'subject', 'cellSubset', and 'filename'.")
   }
 
+  # check to ensure marker names and cell subsets are non-overlapping. Creates issues downstream if this happens.
+  overlapNames <- fcsInfo$cellSubset[fcsInfo$cellSubset %in% markerInfo$commonMarkerName]
+  if (length(overlapNames) > 0){
+    stop(
+      "Cell subset names and marker names must not overlap. The following names were detected in both sets of names: ",
+      paste0(overlapNames, collapse = ", ")
+    )
+  }
+
   # Check that fcs files can be found, and get size of all files
   filesThatDontExist <- c()
   sumFileSize <- 0
