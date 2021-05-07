@@ -258,6 +258,8 @@ setupDiscovrExperiment <- function(
   }
   allDataTransformed <- lapply(allMerged, asinhTfmData)
   transformedFlowSet <- as(allDataTransformed, "flowSet")
+  # remove old data to conserve memory
+  rm(allDataTransformed)
 
   # Extract expression data and label Tmr+ events
   mergedExpr <- setNames(
@@ -288,7 +290,6 @@ setupDiscovrExperiment <- function(
   exptInProgress$fcsInfoFile        <- fcsInfoFile
   exptInProgress$fcsInfo            <- fcsInfo
   exptInProgress$parentPopulation   <- parentPopulation
-  exptInProgress$allDataTransformed <- allDataTransformed
   exptInProgress$mergedExpr         <- mergedExpr
   exptInProgress$clusteringMarkers  <- clusteringMarkers
   exptInProgress$status             <- "initialized"
@@ -401,23 +402,31 @@ clusterDiscovrExperiment <- function(
     return(community)
   }
 
-  # Run phenograph (using kd treetype) on each subject.
-  # Note that here 'fcs' is the flowFrame object for a subject post-transformation
-  phenographClust = function(fcs, clusteringMarkers) {
-    exprsMat = as.matrix(as.data.frame(exprs(fcs))[,clusteringMarkers])
-    rPhenoVect = as.numeric(igraph::membership(runRpheno(data = exprsMat)))
-    return(rPhenoVect)
-  }
-
   # Cluster data in experiment
   if (method == "phenograph") {
-    experiment$mergedExpr$RPclust = unlist(
-      lapply(
-        experiment$allDataTransformed,
-        phenographClust,
-        experiment$clusteringMarkers
-      )
-    )
+    # initialize RPclust
+    experiment$mergedExpr$RPclust <- NA
+    # assign row IDs for merge
+    experiment$mergedExpr$rowIdx <- c(1:nrow(experiment$mergedExpr))
+    # cluster events within each subject
+    allSubjects <- unique(experiment$mergedExpr$samp)
+    for(currSubj in allSubjects){
+      rPhenoVect = as.numeric(igraph::membership(runRpheno(
+        data = experiment$mergedExpr[
+          experiment$mergedExpr$samp == currSubj,
+          experiment$clusteringMarkers
+        ]
+      )))
+      # add cluster IDs
+      experiment$mergedExpr[experiment$mergedExpr$samp == currSubj, "RPclust"] <- rPhenoVect
+    }
+    # remove row IDs so they don't interfere downstream
+    experiment$mergedExpr <- subset(experiment$mergedExpr, select = -rowIdx)
+    # check to make sure that all events were assigned
+    if(any(is.na(experiment$mergedExpr$RPclust))){
+      stop("Not all events were assigned to a cluster. Please contact the package developer for assistance.")
+    }
+
   } else {
     stop("Clustering method '", method, "' is not currently supported. Stopping...")
   }
