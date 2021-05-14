@@ -228,14 +228,14 @@ makeMetaclusterHeatmaps <- function(
 
   allSubsetZscoreAnnoDf <-
     experiment$hmapDfAllSubsets %>%
-    dplyr::select(.data$sample, !!subsets) %>%
+    dplyr::select(.data$sampRpClust, !!subsets) %>%
     unique %>%
-    dplyr::slice(match(colnames(experiment$allSubsetAllSubjectZscores), .data$sample)) %>%
+    dplyr::slice(match(colnames(experiment$allSubsetAllSubjectZscores), .data$sampRpClust)) %>%
     dplyr::left_join(
-      data.frame(group = experiment$colIndices) %>% rownames_to_column("sample"),
-      by = "sample"
+      data.frame(group = experiment$colIndices) %>% rownames_to_column("sampRpClust"),
+      by = "sampRpClust"
     ) %>%
-    dplyr::mutate(subject = str_replace(.data$sample, "_[0-9]+$", ""))
+    dplyr::mutate(subject = str_replace(.data$sampRpClust, "_[0-9]+$", ""))
 
   if(length(childSubsets > 0)){
     allSubsetZscoreAnnoDf <-
@@ -270,7 +270,7 @@ makeMetaclusterHeatmaps <- function(
   subsetEventCounting <- left_join(
     experiment$subsetEventCounting,
     data.frame(
-      sample = colnames(experiment$allSubsetAllSubjectZscores),
+      sampRpClust = colnames(experiment$allSubsetAllSubjectZscores),
       group = experiment$colIndices
     )
   )
@@ -285,17 +285,13 @@ makeMetaclusterHeatmaps <- function(
 
   allSubsetZscoreAnno <-
     ComplexHeatmap::HeatmapAnnotation(
-      df = data.frame(allSubsetZscoreAnnoDf %>% mutate_all(function(val){ifelse(is.na(val), 0, val)})),
+      df = allSubsetZscoreAnnoDf %>% mutate_all(function(val){ifelse(is.na(val), 0, val)}),
       col = allSubsetZscoreAnnoColors,
       show_annotation_name = T,
       show_legend = F)
-  # annotation_legend_param = list(Islet = list(ncol = 4, title_position = "topcenter"),
-  #                                group = list(ncol = 2, title_position = "topcenter"),
-  #                                subject = list(ncol = 4, title_position = "topcenter")),
-  # show_legend = c(F, T, T, T, T))
 
   zscore_hmap <- ComplexHeatmap::Heatmap(
-    experiment$allSubsetAllSubjectZscores[experiment$metaclusterMarkers,],
+    as.matrix(experiment$allSubsetAllSubjectZscores[experiment$metaclusterMarkers,]),
     col = my_zscore_pal,
     name = "z-score",
     # column styling
@@ -360,13 +356,13 @@ makeMetaclusterHeatmaps <- function(
   # Weighted Average phenotype hmap - average of arcsinch values in each metacluster
   perMetaclusterAvg <-
     data.frame(t(experiment$allSubsetAllSubjectArcsinh)) %>%
-    tibble::rownames_to_column("sample") %>%
-    merge(subsetEventCounting, by = "sample") %>%
+    tibble::rownames_to_column("sampRpClust") %>%
+    merge(subsetEventCounting, by = "sampRpClust") %>%
     dplyr::rowwise() %>%
     mutate(
       n_event = sum(c_across(subsets)),
-      subj = stringr::str_remove(.data$sample, "_[0-9]+$"),
-      RP_clust = stringr::str_extract(.data$sample, "[0-9]+$")
+      subj = stringr::str_remove(.data$sampRpClust, "_[0-9]+$"),
+      RP_clust = stringr::str_extract(.data$sampRpClust, "[0-9]+$")
     ) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$subj) %>%
@@ -375,7 +371,7 @@ makeMetaclusterHeatmaps <- function(
     dplyr::mutate(proportion = .data$n_event/.data$subj_event) %>%
     dplyr::mutate_at(experiment$markerInfo$commonMarkerName, list(~.*.data$proportion)) %>%
     dplyr::select(
-      -.data$sample,
+      -.data$sampRpClust,
       -!!subsets,
       -.data$n_event,
       -.data$subj,
@@ -463,13 +459,13 @@ makeMetaclusterHeatmaps <- function(
   # equivalent contributions from subjects with disparate numbers of collected events
   parentPopulationAvg <-
     data.frame(t(experiment$allSubsetAllSubjectArcsinh)) %>%
-    tibble::rownames_to_column("sample") %>%
-    merge(experiment$subsetEventCounting, by = "sample") %>%
+    tibble::rownames_to_column("sampRpClust") %>%
+    merge(experiment$subsetEventCounting, by = "sampRpClust") %>%
     dplyr::rowwise() %>%
     dplyr::mutate(
       n_event = sum(c_across(subsets)),
-      subj = stringr::str_remove(.data$sample, "_[0-9]+$"),
-      RP_clust = stringr::str_extract(.data$sample, "[0-9]+$")
+      subj = stringr::str_remove(.data$sampRpClust, "_[0-9]+$"),
+      RP_clust = stringr::str_extract(.data$sampRpClust, "[0-9]+$")
     ) %>%
     dplyr::ungroup() %>%
     dplyr::group_by(.data$subj) %>%
@@ -478,7 +474,7 @@ makeMetaclusterHeatmaps <- function(
     dplyr::mutate(proportion = .data$n_event/.data$subj_event) %>%
     dplyr::mutate_at(experiment$markerInfo$commonMarkerName, list(~.*.data$proportion)) %>%
     dplyr::select(
-      -.data$sample,
+      -.data$sampRpClust,
       -!!subsets,
       -.data$n_event,
       -.data$subj,

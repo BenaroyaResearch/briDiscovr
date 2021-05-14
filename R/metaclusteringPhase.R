@@ -67,6 +67,7 @@ metaclusterDiscovrExperiment <- function(
     # clean up data
     experiment$clusterRarePopCts %>%
     dplyr::mutate(RPclust = as.character(.data$RPclust)) %>%
+    dplyr::mutate(sampRpClust = paste0(.data$samp, "_", .data$RPclust)) %>%
     left_join(experiment$clusterMeans, by = c("samp", "RPclust")) %>%
     dplyr::filter(!.data$samp %in% dropSamples) %>%
     # Identify low abundance clusters (containing <threshold% of events per subject)
@@ -76,31 +77,41 @@ metaclusterDiscovrExperiment <- function(
     dplyr::mutate(pctCellsInClust = (.data$Total/.data$totalEvents)*100) %>%
     dplyr::filter(.data$pctCellsInClust >= pctInClusterThreshold)
 
+  # get total parent cluster names for each sample to enable filtering
+  sampTotalParentNames <- unique(paste0(experiment$clusterMeans$samp, "_Total_Parent"))
+
   # remove samples and low-abundance clusters from mean data
   experiment$clusterMeans <-
     experiment$clusterMeans %>%
     dplyr::filter(!.data$samp %in% dropSamples) %>%
-    dplyr::mutate(RPclust = as.character(.data$RPclust)) %>%
-    dplyr::filter(.data$RPclust %in% c(experiment$clusterRarePopCts$RPclust, "Total_Parent"))
+    dplyr::mutate(
+      RPclust = as.character(.data$RPclust),
+      sampRpClust = paste0(.data$samp, "_", .data$RPclust)
+    ) %>%
+    dplyr::filter(.data$sampRpClust %in% c(experiment$clusterRarePopCts$sampRpClust, sampTotalParentNames))
 
   # remove samples and low-abundance clusters from expr data
   experiment$mergedExpr <-
     experiment$mergedExpr %>%
     dplyr::filter(!.data$samp %in% dropSamples) %>%
-    dplyr::mutate(RPclust = as.character(.data$RPclust)) %>%
-    dplyr::filter(.data$RPclust %in% experiment$clusterRarePopCts$RPclust)
+    dplyr::mutate(
+      RPclust = as.character(.data$RPclust),
+      sampRpClust = paste0(.data$samp, "_", .data$RPclust)
+    ) %>%
+    dplyr::filter(.data$sampRpClust %in% experiment$clusterRarePopCts$sampRpClust)
 
   # Compute the per-subject/per-cluster standard deviation to later compute z-score
   markerStdDev <-
     experiment$mergedExpr %>%
-    dplyr::select(-.data$cellSubset) %>%
+    dplyr::select(-.data$cellSubset, -.data$sampRpClust) %>%
     unique() %>% # remove duplicated rows; mergedExpr has both parent and gated
     dplyr::group_by(.data$samp, .data$RPclust) %>%
     dplyr::summarise_all(sd)
 
   # Calculate parent pop standard deviations for each sample
-  parentStdDev <- experiment$mergedExpr %>%
-    dplyr::select(-.data$cellSubset, -.data$RPclust) %>%
+  parentStdDev <-
+    experiment$mergedExpr %>%
+    dplyr::select(-.data$cellSubset, -.data$RPclust, -.data$sampRpClust) %>%
     unique() %>% # remove duplicated rows; mergedExpr has both parent and gated
     dplyr::group_by(.data$samp) %>%
     dplyr::summarise_all(sd) %>%
@@ -112,7 +123,7 @@ metaclusterDiscovrExperiment <- function(
   # format mean/var data for ease of use
   subjectMeans = experiment$clusterMeans %>%
     dplyr::filter(.data$RPclust == "Total_Parent") %>%
-    dplyr::select(-.data$RPclust) %>%
+    dplyr::select(-.data$RPclust, -.data$sampRpClust) %>%
     tidyr::gather("marker", "subjectMean", -.data$samp) %>%
     dplyr::rename(subject = .data$samp)
 
@@ -150,15 +161,13 @@ metaclusterDiscovrExperiment <- function(
     unique()
   }
 
-
-  # MGR - not sure what this comment means? return to this at some pt
-  ## Include regardless of colorbar visualization
+  # Get cluster occupancy data in easy to use format
   clustSigPass <-
     dfAllSubsets %>%
     dplyr::select(.data$subject, .data$RPclust, !!subsets) %>%
-    dplyr::mutate(sample = paste0(.data$subject, "_", .data$RPclust))
+    dplyr::mutate(sampRpClust = paste0(.data$subject, "_", .data$RPclust))
 
-  subsetEventCounting <- clustSigPass %>% dplyr::select(.data$sample, !!subsets)
+  subsetEventCounting <- clustSigPass %>% dplyr::select(.data$sampRpClust, !!subsets)
 
   # for each subset (ie: tmr) compute the fraction of all events that fall in each cluster
   for(currSubset in subsets){
@@ -172,7 +181,7 @@ metaclusterDiscovrExperiment <- function(
 
   # round the fractional occupancy to 2 sig. digits and extract data w/ labels
   clustSigPass[,subsets] <- sapply(clustSigPass[,subsets], round, digits = 2)
-  clustSigPass <- clustSigPass[,c("sample", subsets)]
+  clustSigPass <- clustSigPass[,c("sampRpClust", subsets)]
 
   # Create main data object for plotting heatmaps
   hmapDfAllSubsets <-
@@ -185,32 +194,32 @@ metaclusterDiscovrExperiment <- function(
     mutate(
       subjectZScore = (.data$mean - .data$subjectMean)/.data$subjectStdDev,
       subjectArcsinhMean = .data$mean,
-      sample = paste0(.data$subject, "_", .data$RPclust)
+      sampRpClust = paste0(.data$subject, "_", .data$RPclust)
     ) %>%
     dplyr::select(
-      .data$sample,
+      .data$sampRpClust,
       .data$subject,
       .data$marker,
       .data$subjectZScore,
       .data$subjectArcsinhMean
     ) %>%
-    merge(clustSigPass, by="sample")
+    merge(clustSigPass, by="sampRpClust")
 
   # Extract the z-scores for all subjects
   allSubsetAllSubjectZscores <-
     hmapDfAllSubsets %>%
-    reshape2::dcast(marker ~ sample, value.var = "subjectZScore") %>%
+    reshape2::dcast(marker ~ sampRpClust, value.var = "subjectZScore") %>%
     tibble::column_to_rownames("marker")
 
   # Extract the arcsinh fluorescence values for all subjects
   allSubsetAllSubjectArcsinh <-
     hmapDfAllSubsets %>%
-    reshape2::dcast(marker ~ sample, value.var = "subjectArcsinhMean") %>%
+    reshape2::dcast(marker ~ sampRpClust, value.var = "subjectArcsinhMean") %>%
     tibble::column_to_rownames("marker")
 
   # use ComplexHeatmap as a convenient way of applying metaclustering
   metaxHeatmap <- ComplexHeatmap::Heatmap(
-    allSubsetAllSubjectZscores[metaclusterMarkers,],
+    as.matrix(allSubsetAllSubjectZscores[metaclusterMarkers,]),
     clustering_method_columns = linkage,
     clustering_distance_columns = distance,
     clustering_method_rows = linkage,
@@ -228,11 +237,11 @@ metaclusterDiscovrExperiment <- function(
   # compute fraction of each cell subset in each metax for each sample
   metaclusterOccupancy <-
     data.frame(
-      sample = names(colIndices),
+      sampRpClust = names(colIndices),
       metacluster = paste0("metacluster_", colIndices)
     ) %>%
-    dplyr::left_join(subsetEventCounting, by = "sample") %>%
-    dplyr::mutate(subject = stringr::str_remove(.data$sample, "_[0-9]+$"))
+    dplyr::left_join(subsetEventCounting, by = "sampRpClust") %>%
+    dplyr::mutate(subject = stringr::str_remove(.data$sampRpClust, "_[0-9]+$"))
 
   # for each subset (ie: tmr) compute the fraction of all events that fall in each cluster
   for(currSubset in subsets){
