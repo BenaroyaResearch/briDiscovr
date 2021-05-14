@@ -67,6 +67,8 @@ setupDiscovrExperiment <- function(
   }
   # set colnames of marker info data for consistency
   markerInfo <- dplyr::rename(markerInfo, commonMarkerName = !!markerCommonField, fcsMarkerName = !!markerFcsField)
+  # make sure common names are valid
+  markerInfo$commonMarkerName <- make.names(markerInfo$commonMarkerName)
 
   # check for appropriate marker names
   if(nrow(markerInfo) > length(unique(markerInfo$commonMarkerName))){
