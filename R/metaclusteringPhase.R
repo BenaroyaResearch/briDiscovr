@@ -353,11 +353,11 @@ recutMetaclusters <- function(
   # compute fraction of each cell subset in each metax for each sample
   metaclusterOccupancy <-
     data.frame(
-      sample = names(colIndices),
+      sampRpClust = names(colIndices),
       metacluster = paste0("metacluster_", colIndices)
     ) %>%
-    dplyr::left_join(experiment$subsetEventCounting, by = "sample") %>%
-    dplyr::mutate(subject = stringr::str_remove(.data$sample, "_[0-9]+$"))
+    dplyr::left_join(experiment$subsetEventCounting, by = "sampRpClust") %>%
+    dplyr::mutate(subject = stringr::str_remove(.data$sampRpClust, "_[0-9]+$"))
 
   # for each subset (ie: tmr) compute the fraction of all events that fall in each cluster
   subsets <- unique(experiment$fcsInfo$cellSubset)
@@ -365,7 +365,7 @@ recutMetaclusters <- function(
   for(currSubset in subsets){
     currTot <- paste0("total", currSubset)
     metaclusterOccupancy <-
-      dplyr::group_by(metaclusterOccupancy, .data$subject) %>%
+      dplyr::group_by(metaclusterOccupancy, .data$sampRpClust) %>%
       dplyr::mutate(!!currTot := sum(.data[[currSubset]])) %>%
       dplyr::ungroup() %>%
       dplyr::group_by(.data$subject, .data$metacluster) %>%
