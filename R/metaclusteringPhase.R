@@ -226,9 +226,11 @@ metaclusterDiscovrExperiment <- function(
     clustering_distance_rows = distance
   )
 
+  clusterDendro <- as.hclust(ComplexHeatmap::column_dend(metaxHeatmap))
+
   # cut the heatmap dendrogram to get phenotypic metaclusters
   colIndices <- cutree(
-    as.hclust(ComplexHeatmap::column_dend(metaxHeatmap)),
+    clusterDendro,
     k = nMetaclusters
   )
   # actual number of groups after cutting the tree
@@ -275,6 +277,7 @@ metaclusterDiscovrExperiment <- function(
   experiment$allSubsetAllSubjectArcsinh   <- allSubsetAllSubjectArcsinh
   experiment$subsetEventCounting          <- subsetEventCounting
   experiment$metaclusterMarkers           <- metaclusterMarkers
+  experiment$clusterDendro                <- clusterDendro
   experiment$nMetaclusters                <- nMetaclusters
   experiment$metaclusterOccupancy         <- metaclusterOccupancy
   experiment$colIndices                   <- colIndices
@@ -326,25 +329,16 @@ recutMetaclusters <- function(
       "Please use the function 'metaclusterDiscovrExperiment' if performing metaclustering for the first time."
     )
   }
-  if(!"allSubsetAllSubjectZscores" %in% names(experiment)){
+  if(!"clusterDendro" %in% names(experiment)){
     stop(
       "The object does not have the data expected in a metaclustered experiment. ",
       "Please re-run the clustering and metaclustering steps and try again."
     )
   }
 
-  # use ComplexHeatmap as a convenient way of applying metaclustering
-  metaxHeatmap <- ComplexHeatmap::Heatmap(
-    experiment$allSubsetAllSubjectZscores,
-    clustering_method_columns = linkage,
-    clustering_distance_columns = distance,
-    clustering_method_rows = linkage,
-    clustering_distance_rows = distance
-  )
-
   # cut the heatmap dendrogram to get phenotypic metaclusters
   colIndices <- cutree(
-    as.hclust(ComplexHeatmap::column_dend(metaxHeatmap)),
+    experiment$metaClusterDendro,
     k = nMetaclusters
   )
   # actual number of groups after cutting the tree
