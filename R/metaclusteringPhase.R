@@ -227,8 +227,9 @@ metaclusterDiscovrExperiment <- function(
   )
 
   # cut the heatmap dendrogram to get phenotypic metaclusters
+  clusterDendrogram <- as.hclust(ComplexHeatmap::column_dend(metaxHeatmap))
   colIndices <- cutree(
-    as.hclust(ComplexHeatmap::column_dend(metaxHeatmap)),
+    clusterDendrogram,
     k = nMetaclusters
   )
   # actual number of groups after cutting the tree
@@ -281,6 +282,7 @@ metaclusterDiscovrExperiment <- function(
   experiment$kGroups                      <- kGroups
   experiment$linkage                      <- linkage
   experiment$distance                     <- distance
+  experiment$clusterDendrogram            <- clusterDendrogram
   experiment$status                       <- "metaclustered"
 
   return(experiment)
@@ -343,8 +345,9 @@ recutMetaclusters <- function(
   )
 
   # cut the heatmap dendrogram to get phenotypic metaclusters
+  clusterDendrogram <- as.hclust(ComplexHeatmap::column_dend(metaxHeatmap))
   colIndices <- cutree(
-    as.hclust(ComplexHeatmap::column_dend(metaxHeatmap)),
+    clusterDendrogram,
     k = nMetaclusters
   )
   # actual number of groups after cutting the tree
@@ -387,5 +390,6 @@ recutMetaclusters <- function(
   experiment$kGroups                      <- kGroups
   experiment$linkage                      <- linkage
   experiment$distance                     <- distance
+  experiment$clusterDendrogram            <- clusterDendrogram
   return(experiment)
 }
