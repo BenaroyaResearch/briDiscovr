@@ -102,19 +102,19 @@ getFcsNEvents <- function(fcsFile) {
 getSubjectCounts <- function(experiment){
   if(!is.discovrExperiment(experiment)){
     stop(
-      "The object passed to this function is not a valid DISCOV-R experiment object.",
+      "The object passed to this function is not a valid DISCOV-R experiment object. ",
       "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
     )
   }
   if (!'mergedExpr' %in% names(experiment)){
     stop(
-      "The data passed to this function appears incorrectly formatted.",
+      "The data passed to this function appears incorrectly formatted. ",
       "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
     )
   }
   if (!'samp' %in% names(experiment$mergedExpr)){
     stop(
-      "The data passed to this function appears incorrectly formatted.",
+      "The data passed to this function appears incorrectly formatted. ",
       "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
     )
   }
@@ -142,19 +142,19 @@ getSubjectCounts <- function(experiment){
 getSubjectClusters <- function(experiment){
   if(!is.discovrExperiment(experiment)){
     stop(
-      "The object passed to this function is not a valid DISCOV-R experiment object.",
+      "The object passed to this function is not a valid DISCOV-R experiment object. ",
       "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
     )
   }
   if (!'mergedExpr' %in% names(experiment)){
     stop(
-      "The data passed to this function appears incorrectly formatted.",
+      "The data passed to this function appears incorrectly formatted. ",
       "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
     )
   }
   if (!'RPclust' %in% names(experiment$mergedExpr)){
     stop(
-      "The data passed to this function does not appear to have been clustered yet.",
+      "The data passed to this function does not appear to have been clustered yet. ",
       "Please cluster your experiment using the 'clusterDiscovrExperiment' function and try again."
     )
   }
@@ -181,13 +181,13 @@ getSubjectClusters <- function(experiment){
 getMetaclusterOccupancy <- function(experiment, precision=2){
   if(!is.discovrExperiment(experiment)){
     stop(
-      "The object passed to this function is not a valid DISCOV-R experiment object.",
+      "The object passed to this function is not a valid DISCOV-R experiment object. ",
       "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
     )
   }
   if (!'metaclusterOccupancy' %in% names(experiment)){
     stop(
-      "The data passed to this function does not appear to have been metaclustered yet.",
+      "The data passed to this function does not appear to have been metaclustered yet. ",
       "Please perform metaclustering using the 'metaclusterDiscovrExperiment' function and try again."
     )
   }
