@@ -328,7 +328,7 @@ recutMetaclusters <- function(
       "Please use the function 'metaclusterDiscovrExperiment' if performing metaclustering for the first time."
     )
   }
-  if(!"allSubsetAllSubjectZscores" %in% names(experiment)){
+  if(!"clusterDendrogram" %in% names(experiment)){
     stop(
       "The object does not have the data expected in a metaclustered experiment. ",
       "Please re-run the clustering and metaclustering steps and try again."
@@ -337,7 +337,7 @@ recutMetaclusters <- function(
 
   # use ComplexHeatmap as a convenient way of applying metaclustering
   metaxHeatmap <- ComplexHeatmap::Heatmap(
-    experiment$allSubsetAllSubjectZscores,
+    as.matrix(experiment$allSubsetAllSubjectZscores[experiment$metaclusterMarkers,]),
     clustering_method_columns = linkage,
     clustering_distance_columns = distance,
     clustering_method_rows = linkage,
@@ -368,7 +368,7 @@ recutMetaclusters <- function(
   for(currSubset in subsets){
     currTot <- paste0("total", currSubset)
     metaclusterOccupancy <-
-      dplyr::group_by(metaclusterOccupancy, .data$sampRpClust) %>%
+      dplyr::group_by(metaclusterOccupancy, .data$subject) %>%
       dplyr::mutate(!!currTot := sum(.data[[currSubset]])) %>%
       dplyr::ungroup() %>%
       dplyr::group_by(.data$subject, .data$metacluster) %>%
