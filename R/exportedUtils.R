@@ -406,7 +406,7 @@ getEventZScores <- function(experiment, cellSubsets = NA, metaclusters = NA, sub
     unique() %>% # remove duplicated rows; mergedExpr has both parent and gated
     dplyr::group_by(.data$samp) %>%
     dplyr::summarise_all(sd) %>%
-    tidyr::gather("marker", "subjectStdDev", -samp)
+    tidyr::gather("marker", "subjectStdDev", -.data$samp)
 
   message("Computing per-subject means...")
   parentMean <-
@@ -415,7 +415,7 @@ getEventZScores <- function(experiment, cellSubsets = NA, metaclusters = NA, sub
     unique() %>% # remove duplicated rows; mergedExpr has both parent and gated
     dplyr::group_by(.data$samp) %>%
     dplyr::summarise_all(mean) %>%
-    tidyr::gather("marker", "subjectMean", -samp)
+    tidyr::gather("marker", "subjectMean", -.data$samp)
 
   parentMeanStdDev <-
     inner_join(parentMean, parentStdDev, by = c("samp", "marker"))
