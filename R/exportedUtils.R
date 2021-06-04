@@ -202,6 +202,115 @@ getMetaclusterOccupancy <- function(experiment, precision=2){
   return(as.data.frame(metaxVals))
 }
 
+#' Compute and return individual event intensities from a metaclustered experiment
+#'
+#' @param experiment A metaclustered discovrExperiment
+#' @param cellSubsets A string or vector of strings indicating which cell subsets to return event z-scores from
+#' @param metaclusters An integer or vector of integers indicating which metaclusters to return event z-scores from
+#' @param subjects A string or vector of strings indicating which subjects to return event z-scores from
+#' @param markers A string or vector of strings indicating which markers to return event z-scores from
+#' @return A data frame containing arcsinh-transformed event intensities from the events satisfying the requested filters. For any filter field without a specified value, all possible events will be returned.
+#'
+#' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}
+#' @export
+getEventIntensities <- function(experiment, cellSubsets = NA, metaclusters = NA, subjects = NA, markers = NA){
+  if(!is.discovrExperiment(experiment)){
+    stop(
+      "The object passed to this function is not a valid DISCOV-R experiment object. ",
+      "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
+    )
+  }
+  if (!'mergedExpr' %in% names(experiment)){
+    stop(
+      "The data passed to this function appears incorrectly formatted. ",
+      "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
+    )
+  }
+  if (!'RPclust' %in% names(experiment$mergedExpr)){
+    stop(
+      "The data passed to this function does not appear to have been clustered yet. ",
+      "Please cluster your experiment using the 'clusterDiscovrExperiment' function and try again."
+    )
+  }
+  if(experiment$status != "metaclustered"){
+    stop(
+      "The current experiment status is ", experiment$status,
+      ". The experiment must be metaclustered before using this function."
+    )
+  }
+
+  # If arguments are left as NA assign to all values
+  if(is.na(cellSubsets)){
+    cellSubsets <- unique(experiment$mergedExpr$cellSubset)
+  }
+  if(is.na(subjects)){
+    subjects <- unique(experiment$mergedExpr$samp)
+  }
+  if(is.na(markers)){
+    markers <- unique(experiment$markerInfo$commonMarkerName)
+  }
+  if(is.na(metaclusters)){
+    metaclusters <- 1:experiment$nMetaclusters
+  }
+
+  # Check validity of filters
+  if(!all(cellSubsets %in% experiment$mergedExpr$cellSubset)){
+    stop(
+      "Requested values in the 'cellSubset' filter could not be found in the data. ",
+      "Please check these values and try again."
+    )
+  }
+  if(!all(subjects %in% experiment$mergedExpr$samp)){
+    stop(
+      "Requested values in the 'subject' filter could not be found in the data. ",
+      "Please check these values and try again."
+    )
+  }
+  if(!all(markers %in% names(experiment$mergedExpr))){
+    stop(
+      "Requested values in the 'markers' filter could not be found in the data. ",
+      "Please check these values and try again."
+    )
+  }
+  is.wholenumber <-
+    function(x, tol = .Machine$double.eps^0.5){ abs(x - round(x)) < tol }
+  if(!all(is.wholenumber(metaclusters))){
+    stop(
+      "Requested values in the 'metaclusters' filter do not appear to be whole number values. ",
+      "Please check these values and try again."
+    )
+  }
+  if(max(metaclusters) > experiment$nMetaclusters){
+    stop(
+      "Requested values in the 'metaclusters' filter are greater than the number of metaclusters (", experiment$nMetaclusters, "). ",
+      "Please check these values and try again."
+    )
+  }
+
+  message("Retrieving intensities for the selected events. Please be patient, this may take a moment...")
+
+  # get metacluster indices
+  metaclusterIndices <-
+    data.frame(metacluster = experiment$colIndices) %>%
+    tibble::rownames_to_column("sampRpClust") %>%
+    dplyr::filter(.data$metacluster %in% metaclusters)
+
+  # filter the data
+  rowsToUse <- (experiment$mergedExpr$samp %in% subjects) & (experiment$mergedExpr$cellSubset %in% cellSubsets)
+  colsToUse <- unique(c(markers, "samp", "cellSubset", "sampRpClust"))
+
+  intensityData <-
+    experiment$mergedExpr[rowsToUse, colsToUse] %>%
+    # merge in metacluster indices and filter out metaclusters to exclude
+    dplyr::inner_join(metaclusterIndices, by = "sampRpClust") %>%
+    dplyr::rename(
+      cluster = .data$sampRpClust,
+      subject = .data$samp
+    )
+
+  return(intensityData)
+}
+
 #' Compute and return individual event z-scores from a metaclustered experiment
 #'
 #' @param experiment A metaclustered discovrExperiment
@@ -323,20 +432,24 @@ getEventZScores <- function(experiment, cellSubsets = NA, metaclusters = NA, sub
   colsToUse <- unique(c(markers, "samp", "cellSubset", "sampRpClust"))
 
   zScoreData <-
-    experiment$mergedExpr[rowsToUse, colsToUse] %>%
+    # get filtered intensity data with metacluster info attached
+    getEventIntensities(
+      experiment = experiment,
+      cellSubsets = cellSubsets,
+      metaclusters = metaclusters,
+      subjects = subjects,
+      markers = markers
+    ) %>%
     # track event ID to help re-spread table later
     dplyr::mutate(event = row_number()) %>%
-    tidyr::gather("marker", "value", -.data$samp, -.data$cellSubset, -.data$sampRpClust, -.data$event) %>%
-    # merge in metacluster indices
-    dplyr::inner_join(metaclusterIndices, by = "sampRpClust") %>%
+    tidyr::gather("marker", "value", -.data$subject, -.data$cellSubset, -.data$cluster, -.data$event, -.data$metacluster) %>%
     # merge in stdev and mean
-    dplyr::inner_join(parentMeanStdDev, by = c("samp", "marker")) %>%
+    dplyr::inner_join(parentMeanStdDev, by = c("subject" = "samp", "marker" = "marker")) %>%
     # compute z-score
     dplyr::mutate(zScore = (.data$value-.data$subjectMean)/.data$subjectStdDev) %>%
     # reformat data
-    dplyr::select(.data$samp, .data$marker, .data$zScore, .data$metacluster, .data$event) %>%
+    dplyr::select(.data$subject, .data$cellSubset, .data$marker, .data$zScore, .data$cluster, .data$metacluster, .data$event) %>%
     tidyr::spread("marker", "zScore") %>%
-    dplyr::rename(subject = .data$samp) %>%
     dplyr::select(-.data$event)
 
   return(zScoreData)
