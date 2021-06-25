@@ -423,7 +423,7 @@ clusterDiscovrExperiment <- function(
       experiment$mergedExpr[experiment$mergedExpr$samp == currSubj, "RPclust"] <- rPhenoVect
     }
     # remove row IDs so they don't interfere downstream
-    experiment$mergedExpr <- subset(experiment$mergedExpr, select = -rowIdx)
+    experiment$mergedExpr <- subset(experiment$mergedExpr, select = -.data$rowIdx)
     # check to make sure that all events were assigned
     if(any(is.na(experiment$mergedExpr$RPclust))){
       stop("Not all events were assigned to a cluster. Please contact the package developer for assistance.")
