@@ -338,7 +338,7 @@ recutMetaclusters <- function(
 
   # cut the heatmap dendrogram to get phenotypic metaclusters
   colIndices <- cutree(
-    experiment$clusterDendro,
+    experiment$metaClusterDendro,
     k = nMetaclusters
   )
   # actual number of groups after cutting the tree
