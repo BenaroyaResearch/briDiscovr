@@ -162,17 +162,17 @@ setupDiscovrExperiment <- function(
 
   # Check fcs files for byte offset issue that will prevent analysis
   filesWithOffsetIssues <- c()
-  for(currFile in fcsInfo$filename){
-    if(checkForFcsByteOffsetIssue(currFile)){
-      filesWithOffsetIssues <- c(filesWithOffsetIssues, currFile)
+  for (currFile in fcsInfo$filename) {
+    if (checkForFcsByteOffsetIssue(currFile)) {
+      filesWithOffsetIssues <- c(filesWithOffsetIssues,
+                                 currFile)
     }
   }
-  if(length(filesWithOffsetIssues > 0)){
-    stop(paste(
-      "The following files have byte offset issues and cannot be used. Please try re-exporting these files:\n",
-      paste0(filesWithOffsetIssues, collapse = "\n")
-    ))
+  if (length(filesWithOffsetIssues > 0)) {
+    stop(paste("Found", length(filesWithOffsetIssues), "files with byte offset issues. For details, see error message(s) above. Please try re-exporting these files:\n",
+               paste0(filesWithOffsetIssues, collapse = "\n")))
   }
+  
 
   # Check fcs files for 0 events, which will prevent analysis
   filesWithNoEvents <- c()
@@ -206,6 +206,18 @@ setupDiscovrExperiment <- function(
     # confirm that all markers to be used in clustering are mappable to fcs parameter names
     clusteringMarkerDesc <- markerInfo[markerInfo$useToCluster, "fcsMarkerName", drop = TRUE]
     missingMarkers <- clusteringMarkerDesc[!clusteringMarkerDesc %in% pData(parameters(fcs))$desc]
+    
+    # check for missingMarkers in name field of flowFrame parameters, where desc is empty
+    missingMarkersToRename <- intersect(missingMarkers, pData(parameters(fcs))$name)
+    missingMarkersToRename <-
+      missingMarkersToRename[
+        is.na(pData(parameters(fcs))$desc[match(missingMarkersToRename, pData(parameters(fcs))$name)])]
+    if (length(missingMarkersToRename) > 0){
+      pData(parameters(fcs))$desc[match(missingMarkers, pData(parameters(fcs))$name)] <-
+        missingMarkersToRename
+    }
+    missingMarkers <- setdiff(missingMarkers, missingMarkersToRename)
+    
     if(length(missingMarkers) > 0){
       stop("Could not find the following clustering markers in the .fcs data\n", paste0(missingMarkers, collapse = ", "))
     }

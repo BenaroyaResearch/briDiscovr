@@ -13,12 +13,16 @@ checkForFcsByteOffsetIssue(fcsFile)
 Boolean: TRUE if there's an offset issue detected, FALSE otherwise
 }
 \description{
-Opens an .fcs file in binary mode and reads the 2 values of
-the byte offset from the text header. These should agree with one another as
-a check for file data integrity, but in practice the values are often off
-by one. This seems to be related to exporting rare gated populations from
-flowJo, and can often be corrected by re-gating and re-exporting.
+Uses flowCore functions to check the 2 values of the byte offset from the
+text header. These should agree with one another as a check for file data
+integrity, but in practice the values are often off by one. This seems to
+be related to exporting rare gated populations from flowJo, and can often
+be corrected by re-gating and re-exporting. This function previously used
+custom code that threw an error when one set of values were 0s; the
+flowCore functions have better handling for this case.
 }
 \author{
 Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}
+
+Matthew J Dufort, \email{mdufort@benaroyaresearch.org}
 }

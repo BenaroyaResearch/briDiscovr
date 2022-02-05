@@ -17,8 +17,12 @@ Many clustering algorithms cannot handle data objects with no events, so this
 utility is provided as a way to quickly check the number of events in a file.
 The number of events is parsed from the text header using low-level file
 I/O, so counting the events in very large .fcs files will not take
-longer than smaller files.
+longer than smaller files. It was modified in Feb 2022 to use flowCore
+functions that read the data location from the header tags if the values are
+missing from the initial header string.
 }
 \author{
 Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}
+
+Matthew J Dufort, \email{mdufort@benaroyaresearch.org}
 }
