@@ -1,55 +1,44 @@
-## Copyright (C) 2020  Mario Rosasco, Virginia Muir, and Benaroya Research Institute
+## Copyright (C) 2022  Matt Dufort, Mario Rosasco, Virginia Muir, and Benaroya Research Institute
 ##
 ## This file is part of the briDiscovr package
 
 
 #' Check for byte offset corruption in the header of an .fcs file
 #'
-#' Opens an .fcs file in binary mode and reads the 2 values of
-#' the byte offset from the text header. These should agree with one another as
-#' a check for file data integrity, but in practice the values are often off
-#' by one. This seems to be related to exporting rare gated populations from
-#' flowJo, and can often be corrected by re-gating and re-exporting.
+#' Uses flowCore functions to check the 2 values of the byte offset from the
+#' text header. These should agree with one another as a check for file data
+#' integrity, but in practice the values are often off by one. This seems to
+#' be related to exporting rare gated populations from flowJo, and can often
+#' be corrected by re-gating and re-exporting. This function previously used
+#' custom code that threw an error when one set of values were 0s; the
+#' flowCore functions have better handling for this case.
 #'
 #' @param fcsFile A string containing the location of an .fcs file
 #' @return Boolean: TRUE if there's an offset issue detected, FALSE otherwise
 #'
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}
-#' @importFrom stringr str_extract str_replace str_replace_all regex
+#' @author Matthew J Dufort, \email{mdufort@@benaroyaresearch.org}
 #' @export
 checkForFcsByteOffsetIssue <- function(fcsFile){
   fileHandle <- file(fcsFile, "rb")
-  # toss un-needed header info
-  readChar(fileHandle, nchars = 26)
-
-  headDataStartOffset <- as.integer(readChar(fileHandle, 8))
-  headDataEndOffset <- as.integer(readChar(fileHandle, 8))
-
-  # check for start/end validity
-  if(!(headDataEndOffset > headDataStartOffset) | (headDataStartOffset < 42)){
-    close(fileHandle)
-    return(TRUE)
-  }
-
-  tmpData <- readChar(fileHandle, headDataStartOffset - 42)
+  # check for start/end validity using flowCore functions
+  offsets <-
+    tryCatch(
+      flowCore:::findOffsets(fileHandle), 
+      error = function(cond) {
+        msg(paste0("Byte offset issue in file ", fcsFile, ": ", cond, "\n"))
+        return(NA)})
   close(fileHandle)
-
-  # get the separator character
-  sepChar <- str_extract(tmpData, regex("\\$BEGINDATA.", dotall = T)) %>% str_replace("\\$BEGINDATA", "")
-
-  textDataStartOffset <-
-    str_extract(tmpData, paste0("\\$BEGINDATA\\", sepChar, "[0-9]+")) %>%
-    str_replace_all(paste0("\\$BEGINDATA|\\", sepChar), "") %>%
-    as.integer()
-  textDataEndOffset <-
-    str_extract(tmpData, paste0("\\$ENDDATA\\", sepChar, "[0-9]+")) %>%
-    str_replace_all(paste0("\\$ENDDATA\\", sepChar), "") %>%
-    as.integer()
-
-  byteOffsetOk <-
-    (textDataStartOffset == headDataStartOffset) &
-    (textDataEndOffset == headDataEndOffset)
-
+  
+  if (length(offsets) == 1 && is.na(offsets)) {
+    byteOffsetOk <- FALSE
+  } else if (offsets[["datastart"]] > 0 && offsets[["dataend"]] > offsets[["datastart"]]) {
+    byteOffsetOk <- TRUE
+  } else stop(paste0("Error encountered checking for byte offset issue in file ", fcsFile, ".",
+                     "Offset values are illogical.\n",
+                     "Data start value: ", offsets[["datastart"]], "\n",
+                     "Data end value: ", offsets[["dataend"]]))
+  
   return(!byteOffsetOk)
 }
 
@@ -59,32 +48,20 @@ checkForFcsByteOffsetIssue <- function(fcsFile){
 #' utility is provided as a way to quickly check the number of events in a file.
 #' The number of events is parsed from the text header using low-level file
 #' I/O, so counting the events in very large .fcs files will not take
-#' longer than smaller files.
+#' longer than smaller files. It was modified in Feb 2022 to use flowCore
+#' functions that read the data location from the header tags if the values are
+#' missing from the initial header string.
 #'
 #' @param fcsFile A string containing the location of an .fcs file
 #' @return Numeric indicating the number of events listed in the .fcs header
 #'
 #' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}
+#' @author Matthew J Dufort, \email{mdufort@@benaroyaresearch.org}
 #' @importFrom stringr str_extract str_replace str_replace_all regex
 #' @export
 getFcsNEvents <- function(fcsFile) {
-  fileHandle <- file(fcsFile, "rb")
-  # toss un-needed header info
-  readChar(fileHandle, nchars = 26)
-
-  headDataStartOffset <- as.integer(readChar(fileHandle, 8))
-  headDataEndOffset <- as.integer(readChar(fileHandle, 8))
-  tmpData <- readChar(fileHandle, headDataStartOffset - 42)
-  close(fileHandle)
-
-  # get the separator character
-  sepChar <- str_extract(tmpData, regex("\\$TOT.", dotall = T)) %>% str_replace("\\$TOT", "")
-
-  nEvents <-
-    str_extract(tmpData, paste0("\\$TOT\\", sepChar, "[0-9]+")) %>%
-    str_replace_all(paste0("\\$TOT|\\", sepChar), "") %>%
-    as.integer()
-
+  header <- flowCore::read.FCSheader(fcsFile)
+  nEvents <- as.integer(header[[1]][["$TOT"]])
   return(nEvents)
 }
 
