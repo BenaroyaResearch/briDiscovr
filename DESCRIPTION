@@ -4,7 +4,7 @@ Title: Distribution analysis across clusters of a parent population overlaid wit
 Version: 0.3.4
 Authors@R: c(
   person("Mario", "Rosasco", email = "mrosasco@benaroyaresearch.org", role = c("aut", "cre")),
-  person("Matt", "Dufort", email = "mdufort@benaroyaresearch.org", role = c("aut", "cre")),
+  person("Matt", "Dufort", email = "mdufort@benaroyaresearch.org", role = c("ctb")),
   person("Virginia", "Muir", role = c("ctb")))
 URL: https://github.com/BenaroyaResearch/briDiscovr
 Description: A package designed to facilitate the metaclustering analysis described in Wiedeman et al., 
