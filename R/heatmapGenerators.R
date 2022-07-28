@@ -38,7 +38,7 @@
 #' @return An S3 object of class \code{discovrExperiment}
 #'
 #' @seealso \code{\link{setupDiscovrExperiment}} \code{\link{clusterDiscovrExperiment}} \code{\link{metaclusterDiscovrExperiment}}
-#' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
+#' @author Mario G Rosasco, Virginia Muir
 #' @import dplyr
 #' @importFrom tibble rownames_to_column
 #' @importFrom stringr str_remove str_extract

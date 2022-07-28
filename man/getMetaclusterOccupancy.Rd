@@ -20,5 +20,5 @@ Display the fraction of events that are found in each metacluster for each
 sample and cell subset
 }
 \author{
-Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}
+Mario G Rosasco
 }

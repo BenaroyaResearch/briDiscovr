@@ -36,5 +36,5 @@ Re-cut a metaclustered experiment with a different target number of metaclusters
 \code{\link{metaclusterDiscovrExperiment}}
 }
 \author{
-Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}, Virginia Muir
+Mario G Rosasco, Virginia Muir
 }

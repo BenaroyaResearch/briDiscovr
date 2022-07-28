@@ -22,7 +22,7 @@ functions that read the data location from the header tags if the values are
 missing from the initial header string.
 }
 \author{
-Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}
+Mario G Rosasco
 
 Matthew J Dufort, \email{mdufort@benaroyaresearch.org}
 }

@@ -75,5 +75,5 @@ Generate heatmaps from a metaclustered experiment
 \code{\link{setupDiscovrExperiment}} \code{\link{clusterDiscovrExperiment}} \code{\link{metaclusterDiscovrExperiment}}
 }
 \author{
-Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}, Virginia Muir
+Mario G Rosasco, Virginia Muir
 }

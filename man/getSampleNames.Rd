@@ -13,5 +13,5 @@ getSampleNames(x)
 Get all sample IDs in an experiment
 }
 \author{
-Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}
+Mario G Rosasco
 }

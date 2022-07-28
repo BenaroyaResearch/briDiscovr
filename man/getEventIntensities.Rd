@@ -30,5 +30,5 @@ A data frame containing arcsinh-transformed event intensities from the events sa
 Compute and return individual event intensities from a metaclustered experiment
 }
 \author{
-Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}
+Mario G Rosasco
 }

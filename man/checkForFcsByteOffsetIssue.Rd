@@ -22,7 +22,7 @@ custom code that threw an error when one set of values were 0s; the
 flowCore functions have better handling for this case.
 }
 \author{
-Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}
+Mario G Rosasco
 
 Matthew J Dufort, \email{mdufort@benaroyaresearch.org}
 }

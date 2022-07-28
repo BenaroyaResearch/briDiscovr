@@ -30,5 +30,5 @@ A data frame containing event z-scores (computed per-subject) from the events sa
 Compute and return individual event z-scores from a metaclustered experiment
 }
 \author{
-Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}
+Mario G Rosasco
 }

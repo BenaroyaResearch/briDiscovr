@@ -16,5 +16,5 @@ A data frame containing the number of events detected for each subject
 Display the per-subject event counts in an experiment
 }
 \author{
-Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}, Virginia Muir
+Mario G Rosasco, Virginia Muir
 }

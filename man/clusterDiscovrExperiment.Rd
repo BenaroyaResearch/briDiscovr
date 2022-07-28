@@ -31,5 +31,5 @@ Perform phenograph clustering for a DISCOV-R experiment
 \code{\link{setupDiscovrExperiment}} \code{\link{discovrExperiment}}
 }
 \author{
-Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}, Virginia Muir
+Mario G Rosasco, Virginia Muir
 }

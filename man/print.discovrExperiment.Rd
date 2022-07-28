@@ -15,5 +15,5 @@
 Prints summary information about the experiment structure.
 }
 \author{
-Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}
+Mario G Rosasco
 }

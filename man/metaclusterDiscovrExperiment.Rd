@@ -50,5 +50,5 @@ Perform metaclustering for a DISCOV-R experiment
 \code{\link{setupDiscovrExperiment}} \code{\link{clusterDiscovrExperiment}}
 }
 \author{
-Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}, Virginia Muir
+Mario G Rosasco, Virginia Muir
 }

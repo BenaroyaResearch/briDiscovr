@@ -22,7 +22,7 @@
 #' @aliases discovrExperiment is.discovrExperiment
 #'
 #' @seealso \code{\link{setupDiscovrExperiment}}
-#' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}
+#' @author Mario G Rosasco
 #' @export
 is.discovrExperiment <- function(x){ inherits(x, "discovrExperiment") }
 
@@ -33,7 +33,7 @@ is.discovrExperiment <- function(x){ inherits(x, "discovrExperiment") }
 #' @param x discovrExperiment object
 #' @param ... other arguments to be passed to generic print method
 #'
-#' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}
+#' @author Mario G Rosasco
 #' @method print discovrExperiment
 #' @export
 print.discovrExperiment <- function(x, ...){
@@ -56,7 +56,7 @@ print.discovrExperiment <- function(x, ...){
 #'
 #' @param x discovrExperiment object
 #'
-#' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}
+#' @author Mario G Rosasco
 #' @export
 getSampleNames <- function(x){
   if(!is.discovrExperiment(x))

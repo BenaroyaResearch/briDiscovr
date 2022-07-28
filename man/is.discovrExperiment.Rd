@@ -25,5 +25,5 @@ should rely on the setup, clustering, and metaclustering functions implemented i
 \code{\link{setupDiscovrExperiment}}
 }
 \author{
-Mario G Rosasco, \email{mrosasco@benaroyaresearch.org}
+Mario G Rosasco
 }

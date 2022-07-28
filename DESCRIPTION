@@ -1,11 +1,11 @@
 Package: briDiscovr
 Type: Package
 Title: Distribution analysis across clusters of a parent population overlaid with a rare subpopulation
-Version: 0.3.4
+Version: 0.3.5
 Authors@R: c(
-  person("Mario", "Rosasco", email = "mrosasco@benaroyaresearch.org", role = c("aut", "cre")),
-  person("Matt", "Dufort", email = "mdufort@benaroyaresearch.org", role = c("ctb")),
-  person("Virginia", "Muir", role = c("ctb")))
+  person("Mario", "Rosasco", role = c("aut")),
+  person("Virginia", "Muir", role = c("aut")),
+  person("Matt", "Dufort", email = "mdufort@benaroyaresearch.org", role = c("aut", "cre")))
 URL: https://github.com/BenaroyaResearch/briDiscovr
 Description: A package designed to facilitate the metaclustering analysis described in Wiedeman et al., 
     2020, J Clin Invest. In brief, the approach defines phenotypic clusters from a parent population 

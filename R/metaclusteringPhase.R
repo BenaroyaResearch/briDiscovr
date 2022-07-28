@@ -23,7 +23,7 @@
 #' @return An S3 object of class \code{discovrExperiment}
 #'
 #' @seealso \code{\link{setupDiscovrExperiment}} \code{\link{clusterDiscovrExperiment}}
-#' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
+#' @author Mario G Rosasco, Virginia Muir
 #' @import dplyr
 #' @importFrom rlang .data :=
 #' @importFrom tidyr gather
@@ -302,7 +302,7 @@ metaclusterDiscovrExperiment <- function(
 #' @return An S3 object of class \code{discovrExperiment}
 #'
 #' @seealso \code{\link{metaclusterDiscovrExperiment}}
-#' @author Mario G Rosasco, \email{mrosasco@@benaroyaresearch.org}, Virginia Muir
+#' @author Mario G Rosasco, Virginia Muir
 #' @import dplyr
 #' @importFrom flowCore exprs
 #' @importFrom stats as.hclust sd cutree

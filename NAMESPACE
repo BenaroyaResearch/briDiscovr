@@ -2,8 +2,10 @@
 
 S3method(print,discovrExperiment)
 export(Rphenograph)
+export(checkFcsFiles)
 export(checkForFcsByteOffsetIssue)
 export(clusterDiscovrExperiment)
+export(downsampleFcsList)
 export(find_neighbors)
 export(getEventIntensities)
 export(getEventZScores)
