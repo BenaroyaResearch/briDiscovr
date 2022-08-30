@@ -13,7 +13,7 @@ Functions implementing and supporting the "Distribution analysis across clusters
 2. Open R and install devtools using ```install.packages("devtools")```
 3. Install this package using ```devtools::install_github("BenaroyaResearch/briDiscovr")```
   * If you encounter difficulties with any dependency packages, please see the "Dependencies" section at the bottom of this page.
-  
+
 ---
 
 ## Usage
@@ -50,6 +50,7 @@ This file should contain 3 columns:
 * A column named 'filename' indicating where to find the .fcs file for that patient and cell subset (eg: "/Users/mrosasco/Documents/projects/briUtils/briDiscovr/testFiles/Xpb997364476_A2_CD8_T_Cells.fcs"). 
   * Note that it's possible to use paths relative to your working directory, but it's generally preferred to provide an absolute path.
   
+
 Example "fcsManifest.csv":
 
 | subject |	cellSubset | filename |
@@ -57,7 +58,24 @@ Example "fcsManifest.csv":
 | SubjXpb997364476 | A2_CD8_T_Cells | /Users/mrosasco/Documents/projects/briUtils/briDiscovr/testFiles/Xpb997364476_A2_CD8_T_Cells.fcs |
 | SubjXpb997364476 | A2_Er168+_EBV | /Users/mrosasco/Documents/projects/briUtils/briDiscovr/testFiles/Xpb997364476_A2_Er168+_EBV.fcs |
 | ... | ... | ... |
-  
+
+### Downsampling FCS files
+
+Some large datasets may exhaust the available memory or require a very long time to analyze. The package includes code to downsample each FCS file to a maximum number of events, in order to reduce memory usage and computational time. This is done using the function `downsampleFcsFiles()`. Detailed documentation can be accessed by `?downsampleFcsList`. There are two different ways to use this function. (1) write out a new set of FCS files and a new .fcs information file, or (2) generate a list of vectors that can be passed to `setupDiscovrExperiment()` to downsample the files as they are read in.
+
+This downsampling can be made reproducible by specifying a random number seed using the `seed` argument. In addition, you can specify to only downsample files from specific populations (e.g. the parent population when working with antigen-specific cells and a parent population).
+
+```R
+library(briDiscovr)
+
+myDownsampleVectorList <- downsampleFcsList(
+    fcsInfoFile = "fcsManifest.csv",
+    maxEvents = 10000,
+    downsampleMode = "storeVectors",
+    seed = 12345
+)
+```
+
 ### Setting up your experiment
 
 Once you have the information about your study design in your marker info and .fcs info files, you're ready to begin your analysis. This is done by using the `setupDiscovrExperiment()` function as shown below. More information about how to use this function can be accessed using `?setupDiscovrExperiment`.
@@ -73,6 +91,8 @@ myExpt <- setupDiscovrExperiment(
 ```
 
 This will load in the .fcs files, check for any issues with the data, clean the marker names, and transform the event data using an arcsinh transform. For details on the appropriate transformation parameters for CyTOF and FACS data, please see `?setupDiscovrExperiment`.
+
+If you have run downsampling and generated a list of vectors for downsampling the input .fcs files, this can be passed to `setupDiscovrExperiment()` using the argument `downsampleVectorList`.
 
 Once the data are loaded, you can access summary information by using the functions `print()` and `getSubjectCounts()`. This is useful to do before clustering as a 'sanity check' to make sure that your markers look as expected, and that you have reasonable numbers of event counts for all individuals in your dataset.
 
