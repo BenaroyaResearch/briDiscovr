@@ -1,7 +1,7 @@
 Package: briDiscovr
 Type: Package
 Title: Distribution analysis across clusters of a parent population overlaid with a rare subpopulation
-Version: 0.3.6
+Version: 0.3.7
 Authors@R: c(
   person("Mario", "Rosasco", role = c("aut")),
   person("Virginia", "Muir", role = c("aut")),
@@ -14,7 +14,7 @@ Description: A package designed to facilitate the metaclustering analysis descri
 License: file LICENSE
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.1.2
+RoxygenNote: 7.2.3
 LinkingTo: 
     Rcpp
 biocViews:
@@ -27,7 +27,6 @@ Imports:
     dplyr,
     tibble,
     tidyr,
-    readr,    
     magrittr,
     stringr,
     reshape2,

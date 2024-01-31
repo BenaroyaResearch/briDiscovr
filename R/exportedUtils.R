@@ -34,7 +34,7 @@ checkForFcsByteOffsetIssue <- function(fcsFile){
     byteOffsetOk <- FALSE
   } else if (offsets[["datastart"]] > 0 && offsets[["dataend"]] > offsets[["datastart"]]) {
     byteOffsetOk <- TRUE
-  } else stop(paste0("Error encountered checking for byte offset issue in file ", fcsFile, ".",
+  } else stop(paste0("Error encountered checking for byte offset issue in file ", fcsFile, ".\n",
                      "Offset values are illogical.\n",
                      "Data start value: ", offsets[["datastart"]], "\n",
                      "Data end value: ", offsets[["dataend"]]))
@@ -485,6 +485,9 @@ checkFcsFiles <- function(
     )
   }
   
+  # Check that all files have cells; if they don't, return a vector of filenames with 0 cells
+  
+  
   # Check that the files don't exceed the available system memory
   if(checkMemory){
     currMem <- memuse::Sys.meminfo()
@@ -524,20 +527,9 @@ checkFcsFiles <- function(
     )
   }
   
-  # Check fcs files for byte offset issue that will prevent analysis
-  filesWithOffsetIssues <- c()
-  for (currFile in fcsInfo$filename) {
-    if (checkForFcsByteOffsetIssue(currFile)) {
-      filesWithOffsetIssues <- c(filesWithOffsetIssues,
-                                 currFile)
-    }
-  }
-  if (length(filesWithOffsetIssues > 0)) {
-    stop(paste("Found", length(filesWithOffsetIssues), "files with byte offset issues. For details, see error message(s) above. Please try re-exporting these files:\n",
-               paste0(filesWithOffsetIssues, collapse = "\n")))
-  }
-  
   # Check fcs files for 0 events, which will prevent analysis
+  # this step should be done prior to checking for the byte offset issue,
+  # as files with 0 events will return an uninformative byte offset error message
   filesWithNoEvents <- c()
   for(currFile in fcsInfo$filename){
     if(!getFcsNEvents(currFile) > 0){
@@ -549,6 +541,19 @@ checkFcsFiles <- function(
       "The following files have no events and cannot be used. Please remove these from your list of .fcs files:\n",
       paste0(filesWithNoEvents, collapse = "\n")
     ))
+  }
+  
+  # Check fcs files for byte offset issue that will prevent analysis
+  filesWithOffsetIssues <- c()
+  for (currFile in fcsInfo$filename) {
+    if (checkForFcsByteOffsetIssue(currFile)) {
+      filesWithOffsetIssues <- c(filesWithOffsetIssues,
+                                 currFile)
+    }
+  }
+  if (length(filesWithOffsetIssues > 0)) {
+    stop(paste("Found", length(filesWithOffsetIssues), "files with byte offset issues. For details, see error message(s) above. Please try re-exporting these files:\n",
+               paste0(filesWithOffsetIssues, collapse = "\n")))
   }
   
   return(TRUE)
@@ -593,6 +598,7 @@ checkFcsFiles <- function(
 #' @param seed (default: NULL) numeric, the seed to be passed to 
 #' \code{set.seed} to make the downsampling reproducible.
 #' @param verbose (default: TRUE) A logical specifying whether to display processing messages
+#' @importFrom utils write.csv
 #' @author Matthew J Dufort, \email{mdufort@@benaroyaresearch.org}
 #' @export
 #' @return Depends on \code{downsampleMode}. If 
