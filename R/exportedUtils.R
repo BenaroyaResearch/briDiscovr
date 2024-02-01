@@ -680,3 +680,222 @@ downsampleFcsList <- function(
   }
   return()
 }
+
+
+#' Calculate UMAP coordinates for the cells from a discovrExperiment object
+#'
+#' This function generates a UMAP from the cells in a
+#' discovrExperiment object. To do this, it extracts the marker scores for each
+#' cells, z-scores the expression values within each sample (similar to the
+#' briDiscovr metaclustering process), optionally downsamples the cells to
+#' speed the process (with downsampling frequency tunable at the cell population
+#' level), and then runs the UMAP algorithm. The UMAP algorithm is run using the
+#' \code{umap} package, which is a wrapper for the \code{uwot} package. Results
+#' can be made reproducible by passing a non-NULL value for \code{seed}. This
+#' function returns a data frame with the UMAP coordinates for each cell, as
+#' well as the original cell population, sample information, and metacluster if
+#' available. The outputs are intended to be visualized using plotting software
+#' such as ggplot2.
+#' @param experiment A discovrExperiment created using
+#' \code{setupDiscovrExperiment}, \code{clusterDiscovrExperiment}, or
+#' \code{metaclusterDiscovrExperiment}. In order to return metacluster numbers
+#' for each cell, its status must be "metaclustered".
+#' @param umapMarkers A character vector, the markers to be used for UMAP. For
+#' the default value, NULL, the function extracts the set of markers from the
+#' "clusteringMarkers" element of the discovrExperiment object.
+#' @param downsampleFreq numeric, specifying how to downsample the cells prior
+#' to running UMAP. Several alternative methods can be used by providing
+#' different numeric vectors. If a single value is provided, all
+#' populations are downsampled to this frequency. If a vector of length 2 is
+#' provided (optionally with elements named "parentPopulation" and
+#' "childPopulations"), the "parentPopulation" or first element is used as the
+#' frequency for the parent population (extracted from the discovrExperiment
+#' object), and the "childPopulations" or second element is used as the
+#' frequency for the child populations. If a named vector is provided, the names
+#' must match the cell populations, and the values are the frequencies
+#' to downsample each population to. If NULL, no downsampling is performed. The
+#' default is c("parentPopulation" = 100, "childPopulations" = 1), which retains
+#' all cells from child populations and subsets the parent population to 1/100.
+#' Note that downsampling is based on the order of the cells in
+#' discovrExperiment, so changes that alter the order of cells will make the
+#' downsampling results non-reproducible.
+#' @param seed (default: NULL) numeric, the seed to be passed to 
+#' \code{set.seed} to make the UMAP (more) reproducible. If NULL, no seed is set.
+#' @param returnUmapObject (default: FALSE) logical, if TRUE, returns the full
+#' UMAP output object and the data frame of cell information as a list. If
+#' FALSE, returns only the data frame of cell information.
+#' @param returnExpressionZScores (default: FALSE) logical, if TRUE, includes the
+#' z-scored expression values for the markers used in the UMAP in the output
+#' data frame. If FALSE, the data frame only contains the UMAP coordinates and
+#' cell information.
+#' @param ... optional arguments passed to \code{umap::umap}.
+#' @importFrom umap umap
+#' @import dplyr
+#' @author Matthew J Dufort, \email{mdufort@@benaroyaresearch.org}
+#' @export
+#' @return A data frame containing the UMAP coordinates for each cell, as columns
+#' 'UMAP1' and 'UMAP2', and the original cell population and sample information.
+#' The data frame also contains the metacluster information, if available.
+#' If \code{returnUmapObject} is TRUE, returns a list with the data frame of
+#' cell information as element 'data' and the UMAP output object as element
+#' 'umapObject'.
+#' If \code{returnExpressionZScores} is TRUE, the data frame also contains the
+#' z-scored expression values for the markers used in the UMAP.
+runUmapDiscovrExperiment <- function(
+    experiment,
+    umapMarkers = NULL,
+    downsampleFreq = c("parentPopulation" = 100, "childPopulations" = 1),
+    seed = NULL,
+    returnUmapObject = FALSE,
+    returnExpressionZScores = FALSE,
+    ...
+){
+  # check that the experiment is a discovrExperiment
+  if(!is.discovrExperiment(experiment))
+    stop("The input 'experiment' must be a discovrExperiment object.")
+  
+  # check that umapMarkers is valid, and set it to the default if NULL
+  if(is.null(umapMarkers)) {
+    umapMarkers <- experiment$clusteringMarkers
+  } else if(!all(umapMarkers %in% colnames(experiment$mergedExpr))) {
+    stop(
+      paste0(
+        "The input 'umapMarkers' specifies markers that are not present in ",
+        "the 'mergedExpr' element of the discovrExperiment object. Please ",
+        "verify the inclusion of the following markers: ",
+        paste(setdiff(umapMarkers, colnames(experiment$mergedExpr)), 
+              collapse = ", ")))
+  } else if(length(umapMarkers) < 2) {
+    stop("The input 'umapMarkers' must contain at least two markers.")
+  } else umapMarkers <- unique(umapMarkers)
+  
+  # collapse cellSubset field to a character vector (rather than lists)
+  if (!any(lengths(experiment$cellSubset) > 1)) {
+    # if all contain only a single element, collapse to a character vector
+    experiment$mergedExpr$cellSubset <-
+      sapply(experiment$mergedExpr$cellSubset, `[[`, 1)
+  } else {
+    # if any contain multiple elements, use the first non-parent population
+    experiment$mergedExpr$cellSubset <-
+      lapply(
+        experiment$mergedExpr$cellSubset,
+        \(x) {
+          if (length(x) == 1) x else x[which(x != experiment$parentPopulation)[1]]}) %>%
+      unlist()
+  }
+  
+  # check that downsampleFreq is valid, and structure it as a named vector
+  if(is.null(downsampleFreq)) {
+    # if downsampleFreq is NULL, no downsampling is performed
+    downsampleFreq <-
+      c("parentPopulation" = 1, "childPopulations" = 1)
+  } else if(!is.null(names(downsampleFreq))) {
+    if (!(setequal(names(downsampleFreq), c("parentPopulation", "childPopulations")) |
+          setequal(names(downsampleFreq), experiment$mergedExpr$cellSubset)))
+      stop(
+        paste0(
+          "If the input 'downsampleFreq' is a named vector, the names must ",
+          "match the values of cellSubset in the discovrExperiment object, or ",
+          "be named 'parentPopulation' and 'childPopulations'."))
+  } else if(is.numeric(downsampleFreq) && length(downsampleFreq) == 1) {
+    # if downsampleFreq is of length 1, it is used for both parent and child
+    downsampleFreq <-
+      c("parentPopulation" = downsampleFreq, "childPopulations" = downsampleFreq)
+  } else if(is.numeric(downsampleFreq) && length(downsampleFreq) == 2) {
+    # if downsampleFreq is of length 2, it is used for parent and child
+    if(setequal(names(downsampleFreq), c("parentPopulation", "childPopulations")))
+      downsampleFreq <-
+        c("parentPopulation" = downsampleFreq[["parentPopulation"]],
+          "childPopulations" = downsampleFreq[["childPopulations"]])
+    downsampleFreq <-
+      c("parentPopulation" = downsampleFreq[[1]], "childPopulations" = downsampleFreq[[2]])
+  } else if(is.numeric(downsampleFreq) && length(downsampleFreq) > 2) {
+    # if downsampleFreq is of length > 2, it is used for each population
+    if(length(downsampleFreq) != length(unique(names(downsampleFreq))))
+      stop("The input 'downsampleFreq' contains duplicate names. Please provide a named vector with unique names.")
+    if(!setequal(names(downsampleFreq), experiment$mergedExpr$cellSubset))
+      stop("The input 'downsampleFreq' does not contain the same names as the cell populations in the 'mergedExpr' element of the discovrExperiment object.")
+  } else stop("The input 'downsampleFreq' is not valid. Please provide NULL or a numeric vector of length > 0.")
+  
+  # standardize downsampleFreq to be a named vector with the same names as the cell populations
+  if(setequal(names(downsampleFreq), c("parentPopulation", "childPopulations"))) {
+    downsampleFreq <-
+      c(downsampleFreq[["parentPopulation"]],
+        rep(downsampleFreq[["childPopulations"]],
+            length(unique(experiment$mergedExpr$cellSubset)) - 1))
+    names(downsampleFreq) <-
+      c(experiment$parentPopulation,
+        setdiff(experiment$mergedExpr$cellSubset, experiment$parentPopulation))
+  }
+  
+  # extract the cell populations and the merged expression matrix, z-score the data
+  exprData <-
+    experiment$mergedExpr %>%
+    dplyr::select(samp, cellSubset, any_of("sampRpClust"), all_of(umapMarkers)) %>%
+    group_by(samp) %>% # group by sample
+    mutate(
+      across(.cols = all_of(umapMarkers),
+             .fns = ~ scale(.x, center = TRUE, scale = TRUE)[,1]))
+  
+  # downsample the data, keeping 1 cell per downsamplefreq
+  if(any(downsampleFreq > 1)) {
+    exprData <-
+      exprData %>%
+      left_join(
+        data.frame(
+          cellSubset = names(downsampleFreq),
+          freq = downsampleFreq),
+        by = "cellSubset") %>%
+      group_by(samp, cellSubset) %>%
+      # keep 1 cell per freq; use remainder of 1 so that the first cell is retained
+      mutate(sampCellSubsetIter = 1:n(),
+             freqRemainder = sampCellSubsetIter %% freq) %>%
+      dplyr::filter(freqRemainder == 1) %>%
+      ungroup() %>%
+      select(-freq, -freqRemainder, -sampCellSubsetIter)
+    
+    # run UMAP on the downsampled data
+    if(!is.null(seed)) set.seed(seed)
+    umapRes <-
+      umap::umap(
+        exprData %>%
+          select(all_of(umapMarkers)) %>%
+          as.matrix(),
+        ...)
+    
+    # if discovrExperiment object has been metaclustered, add metaclusters to exprData
+    if(experiment$status == "metaclustered") {
+      exprData <-
+        exprData %>%
+        left_join(
+          data.frame(
+            sampRpClust = names(experiment$colIndices),
+            metacluster = unname(experiment$colIndices)),
+          by = "sampRpClust") %>%
+        select(-sampRpClust)
+    }
+    
+    # remove expression values from the data frame, unless returnExpressionZScores is TRUE
+    if(!isTRUE(returnExpressionZScores))
+      exprData <- exprData %>%
+      select(sample = samp, cellSubset, any_of("metacluster"))
+  
+    # add the UMAP coordinates to the data frame
+    exprData <-
+      exprData %>%
+      bind_cols(
+        as.data.frame(umapRes$layout) %>%
+          setNames(paste0("UMAP", seq_len(ncol(umapRes$layout))))) %>%
+      as.data.frame()
+    
+    if(isTRUE(returnUmapObject)) {
+      # return the UMAP object
+      return(
+        list(data = exprData,
+             umapObject = umapRes))
+    } else {
+      # return the data frame with UMAP coordinates
+      return(exprData)
+    }
+  }
+}

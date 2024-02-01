@@ -5,7 +5,7 @@
 \alias{discovrExperiment}
 \title{discovrExperiment S3 class}
 \usage{
-## S3 methods for class 'tcrGraph'
+## S3 methods for class 'discovrExperiment'
 is.discovrExperiment(x)
 }
 \arguments{

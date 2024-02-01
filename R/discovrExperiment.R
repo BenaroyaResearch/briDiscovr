@@ -14,7 +14,7 @@
 #'
 #' @usage
 #'
-#' ## S3 methods for class 'tcrGraph'
+#' ## S3 methods for class 'discovrExperiment'
 #' is.discovrExperiment(x)
 #'
 #' @param x object to be tested for class discovrExperiment
