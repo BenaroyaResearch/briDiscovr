@@ -146,8 +146,8 @@ setupDiscovrExperiment <- function(
     if(!is.null(downsampleVectorList)) {
       currDownsampleVectorList <-
         downsampleVectorList[which(fcsInfo$cellSubset == currCellSubset)]
-      for(currFcsNum in (1:length(currFcsList)))
-        if(currDownsampleVectorList[[currFcsNum]] != "all") # skip downsampling if "all" rows specified
+      for(currFcsNum in seq_len(length(currFcsList)))
+        if(!identical(currDownsampleVectorList[[currFcsNum]], "all")) # skip downsampling if "all" rows specified
           currFcsList[[currFcsNum]] <-
             currFcsList[[currFcsNum]][currDownsampleVectorList[[currFcsNum]],]
     }
@@ -158,8 +158,8 @@ setupDiscovrExperiment <- function(
   if(!is.null(downsampleVectorList)) {
     currDownsampleVectorList <-
       downsampleVectorList[which(fcsInfo$cellSubset == parentPopulation)]
-    for(currFcsNum in (1:length(allSubjects)))
-      if(currDownsampleVectorList[[currFcsNum]] != "all") # skip downsampling if "all" rows specified
+    for(currFcsNum in seq_len(length(allSubjects)))
+      if(!identical(currDownsampleVectorList[[currFcsNum]], "all")) # skip downsampling if "all" rows specified
       allSubjects[[currFcsNum]] <-
         allSubjects[[currFcsNum]][currDownsampleVectorList[[currFcsNum]],]
   }
@@ -384,7 +384,7 @@ clusterDiscovrExperiment <- function(
     # initialize RPclust
     experiment$mergedExpr$RPclust <- NA
     # assign row IDs for merge
-    experiment$mergedExpr$rowIdx <- c(1:nrow(experiment$mergedExpr))
+    experiment$mergedExpr$rowIdx <- seq_len(nrow(experiment$mergedExpr))
     # cluster events within each subject
     allSubjects <- unique(experiment$mergedExpr$samp)
     for(currSubj in allSubjects){
@@ -450,7 +450,7 @@ clusterDiscovrExperiment <- function(
     clusterRarePopCts <- cbind(clusterRarePopCts, additionalMatrix$number)
   }
 
-  for(i in 1:(ncol(clusterRarePopCts)-3)){
+  for(i in seq_len(ncol(clusterRarePopCts)-3)){
     colnames(clusterRarePopCts)[i+3] = (uniqueSubsets)[i]
   }
 
@@ -462,14 +462,14 @@ clusterDiscovrExperiment <- function(
 
   clusterRarePopCts = left_join(clusterRarePopCts, aggregateCounts)
 
-  for(i in 1:(length(uniqueSubsets)+1)){
+  for(i in seq_len(length(uniqueSubsets)+1)){
     clusterRarePopCts <- cbind(
       clusterRarePopCts,
       clusterRarePopCts[,i+2]/clusterRarePopCts[,i+2+length(uniqueSubsets)+1]*100
     )
   }
 
-  for(i in 1:(length(uniqueSubsets))){
+  for(i in seq_len(length(uniqueSubsets))){
     colnames(clusterRarePopCts)[i+3+(length(uniqueSubsets)+1)*2]= (paste0("pct_", (uniqueSubsets)[i], "_in_clust"))
   }
   colnames(clusterRarePopCts)[3+(length(uniqueSubsets)+1)*2]= "pct_Total_in_clust"
