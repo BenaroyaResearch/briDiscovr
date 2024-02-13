@@ -7,6 +7,7 @@
 clusterDiscovrExperiment(
   experiment,
   method = "phenograph",
+  k = 30,
   seed = 12345,
   verbose = TRUE
 )
@@ -16,6 +17,8 @@ clusterDiscovrExperiment(
 
 \item{method}{A character string indicating the clustering method to use.
 Currently only 'phenograph' is supported as a clustering method.}
+
+\item{k}{An integer specifying the maximum number of nearest neighbors to use. Applies only if method = 'phenograph' (default: 30)}
 
 \item{seed}{A number to be used as the seed for pseudorandom number generation (default: 12345)}
 

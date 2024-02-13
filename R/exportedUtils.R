@@ -485,9 +485,6 @@ checkFcsFiles <- function(
     )
   }
   
-  # Check that all files have cells; if they don't, return a vector of filenames with 0 cells
-  
-  
   # Check that the files don't exceed the available system memory
   if(checkMemory){
     currMem <- memuse::Sys.meminfo()
@@ -530,17 +527,34 @@ checkFcsFiles <- function(
   # Check fcs files for 0 events, which will prevent analysis
   # this step should be done prior to checking for the byte offset issue,
   # as files with 0 events will return an uninformative byte offset error message
-  filesWithNoEvents <- c()
-  for(currFile in fcsInfo$filename){
-    if(!getFcsNEvents(currFile) > 0){
-      filesWithNoEvents <- c(filesWithNoEvents, currFile)
-    }
-  }
+  fcsInfo$nEvents <- sapply(fcsInfo$filename, getFcsNEvents)
+  filesWithNoEvents <-
+    fcsInfo$filename[fcsInfo$nEvents == 0]
   if(length(filesWithNoEvents > 0)){
     stop(paste(
       "The following files have no events and cannot be used. Please remove these from your list of .fcs files:\n",
       paste0(filesWithNoEvents, collapse = "\n")
     ))
+  }
+  
+  # Check fcs files for subjects with too few events, which will prevent clustering
+  # this is done at the "subject" level rather than the fcs file level because multiple cellSubsets are clustered together for the same subject
+  # only send a warning for this, to allow for clustering approaches downstream that do not require a minimum number of events
+  minEventsPerSubject <- 32 # 32 is the minimum number of events required for clustering with k=30
+  subjectsWithTooFewEvents <-
+    fcsInfo %>%
+    group_by(subject) %>%
+    summarize(nEvents = sum(nEvents)) %>%
+    dplyr::filter(nEvents < minEventsPerSubject) %>%
+    pull(subject)
+  if(length(subjectsWithTooFewEvents > 0)){
+    message(
+      "The following subjects have fewer than ", minEventsPerSubject,
+      " total cells across all cell subsets and cannot be clustered under the ",
+      "default parameters for RPhenograph. Please remove these from your list ",
+      "of .fcs files:\n",
+      paste0(subjectsWithTooFewEvents, collapse = "\n")
+    )
   }
   
   # Check fcs files for byte offset issue that will prevent analysis

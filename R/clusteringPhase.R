@@ -279,6 +279,7 @@ setupDiscovrExperiment <- function(
 #' @param experiment A discovrExperiment created using \code{setupDiscovrExperiment()}
 #' @param method A character string indicating the clustering method to use.
 #' Currently only 'phenograph' is supported as a clustering method.
+#' @param k An integer specifying the maximum number of nearest neighbors to use. Applies only if method = 'phenograph' (default: 30)
 #' @param seed A number to be used as the seed for pseudorandom number generation (default: 12345)
 #' @param verbose A boolean specifying whether to display processing messages (default: TRUE)
 #' @return An S3 object of class \code{discovrExperiment}
@@ -293,6 +294,7 @@ setupDiscovrExperiment <- function(
 clusterDiscovrExperiment <- function(
   experiment,
   method = "phenograph",
+  k = 30,
   seed = 12345,
   verbose = TRUE
 ){
@@ -301,6 +303,21 @@ clusterDiscovrExperiment <- function(
       "The object passed to this function is not a valid DISCOV-R experiment object.",
       "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
     )
+  }
+  
+  # check for subjects with too few events to cluster
+  if(method == "phenograph"){
+    if(verbose){message("Checking for subjects with too few events to cluster...")}
+    subjectCounts <- getSubjectCounts(experiment)
+    if(any(subjectCounts$nEvents < k + 2)){
+      stop(
+        "PhenoGraph clustering can only proceed with subjects that have at ",
+        "least k + 2 (", k + 2, ") total events. Please check or remove the ",
+        "following subjects, or modify the clustering parameters, ",
+        "and try again:\n",
+        paste(subjectCounts$sample[subjectCounts$nEvents < k + 2], collapse = ", ")
+      )
+    }
   }
 
   set.seed(seed)
@@ -317,6 +334,7 @@ clusterDiscovrExperiment <- function(
   }
 
   runRpheno <- function(data, k=30){
+    nDigits <- 3 # set number of digits for time display
     if(is.data.frame(data))
       data <- as.matrix(data)
 
@@ -325,7 +343,7 @@ clusterDiscovrExperiment <- function(
 
     if(k<1){
       stop("k must be a positive integer!")
-    }else if (k > nrow(data)-2){
+    }else if (nrow(data) < k + 2){
       stop("k must be smaller than the total number of points!")
     }
 
@@ -340,7 +358,7 @@ clusterDiscovrExperiment <- function(
 
     if(verbose){
       message(
-        "DONE ~",t1[3],"s\n",
+        "DONE ~", round(t1[3], nDigits), "s\n",
         "Compute jaccard coefficient between nearest-neighbor sets..."
       )
     }
@@ -348,7 +366,7 @@ clusterDiscovrExperiment <- function(
 
     if(verbose){
       message(
-        "DONE ~",t2[3],"s\n",
+        "DONE ~", round(t2[3], nDigits), "s\n",
         "Build undirected graph from the weighted links..."
       )
     }
@@ -360,20 +378,20 @@ clusterDiscovrExperiment <- function(
 
     if(verbose){
       message(
-        "DONE ~",t3[3],"s\n",
+        "DONE ~", round(t3[3], nDigits), "s\n",
         "Run louvain clustering on the graph ..."
       )
     }
 
     t4 <- system.time(community <- igraph::cluster_louvain(g))
     if(verbose){
-      message("DONE ~",t4[3],"s\n")
+      message("DONE ~", round(t4[3], nDigits), "s\n")
     }
 
     if(verbose){
-      message("Run Rphenograph DONE, took a total of ", sum(c(t1[3],t2[3],t3[3],t4[3])), "s.")
-      message("  Return a community class\n  -Modularity value:", igraph::modularity(community),"\n")
-      message("  -Number of clusters:", length(unique(igraph::membership(community))))
+      message("Run Rphenograph DONE, took a total of ", round(sum(c(t1[3],t2[3],t3[3],t4[3])), nDigits), "s.")
+      message("  Return a community class\n  -Modularity value: ", igraph::modularity(community),"\n")
+      message("  -Number of clusters: ", length(unique(igraph::membership(community))))
 
     }
     return(community)
@@ -388,11 +406,15 @@ clusterDiscovrExperiment <- function(
     # cluster events within each subject
     allSubjects <- unique(experiment$mergedExpr$samp)
     for(currSubj in allSubjects){
+      if(verbose){
+        message("\nClustering sample ", match(currSubj, allSubjects), " of ", length(allSubjects), "...")
+      }
       rPhenoVect = as.numeric(igraph::membership(runRpheno(
         data = experiment$mergedExpr[
           experiment$mergedExpr$samp == currSubj,
           experiment$clusteringMarkers
-        ]
+        ],
+        k = k
       )))
       # add cluster IDs
       experiment$mergedExpr[experiment$mergedExpr$samp == currSubj, "RPclust"] <- rPhenoVect
