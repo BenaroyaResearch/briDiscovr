@@ -892,7 +892,7 @@ runUmapDiscovrExperiment <- function(
     # remove expression values from the data frame, unless returnExpressionZScores is TRUE
     if(!isTRUE(returnExpressionZScores))
       exprData <- exprData %>%
-      select(sample = samp, cellSubset, any_of("metacluster"))
+      select(samp, cellSubset, any_of("metacluster"))
   
     # add the UMAP coordinates to the data frame
     exprData <-
