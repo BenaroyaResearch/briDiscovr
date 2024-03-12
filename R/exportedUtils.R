@@ -849,7 +849,8 @@ runUmapDiscovrExperiment <- function(
     group_by(samp) %>% # group by sample
     mutate(
       across(.cols = all_of(umapMarkers),
-             .fns = ~ scale(.x, center = TRUE, scale = TRUE)[,1]))
+             .fns = ~ scale(.x, center = TRUE, scale = TRUE)[,1])) %>%
+    ungroup()
   
   # downsample the data, keeping 1 cell per downsamplefreq
   if(any(downsampleFreq > 1)) {
@@ -867,49 +868,49 @@ runUmapDiscovrExperiment <- function(
       dplyr::filter(freqRemainder == 1) %>%
       ungroup() %>%
       select(-freq, -freqRemainder, -sampCellSubsetIter)
-    
-    # run UMAP on the downsampled data
-    if(!is.null(seed)) set.seed(seed)
-    umapRes <-
-      umap::umap(
-        exprData %>%
-          select(all_of(umapMarkers)) %>%
-          as.matrix(),
-        ...)
-    
-    # if discovrExperiment object has been metaclustered, add metaclusters to exprData
-    if(experiment$status == "metaclustered") {
-      exprData <-
-        exprData %>%
-        left_join(
-          data.frame(
-            sampRpClust = names(experiment$colIndices),
-            metacluster = unname(experiment$colIndices)),
-          by = "sampRpClust") %>%
-        select(-sampRpClust)
-    }
-    
-    # remove expression values from the data frame, unless returnExpressionZScores is TRUE
-    if(!isTRUE(returnExpressionZScores))
-      exprData <- exprData %>%
-      select(samp, cellSubset, any_of("metacluster"))
+  }
   
-    # add the UMAP coordinates to the data frame
+  # run UMAP on the downsampled data
+  if(!is.null(seed)) set.seed(seed)
+  umapRes <-
+    umap::umap(
+      exprData %>%
+        select(all_of(umapMarkers)) %>%
+        as.matrix(),
+      ...)
+  
+  # if discovrExperiment object has been metaclustered, add metaclusters to exprData
+  if(experiment$status == "metaclustered") {
     exprData <-
       exprData %>%
-      bind_cols(
-        as.data.frame(umapRes$layout) %>%
-          setNames(paste0("UMAP", seq_len(ncol(umapRes$layout))))) %>%
-      as.data.frame()
-    
-    if(isTRUE(returnUmapObject)) {
-      # return the UMAP object
-      return(
-        list(data = exprData,
-             umapObject = umapRes))
-    } else {
-      # return the data frame with UMAP coordinates
-      return(exprData)
-    }
+      left_join(
+        data.frame(
+          sampRpClust = names(experiment$colIndices),
+          metacluster = unname(experiment$colIndices)),
+        by = "sampRpClust") %>%
+      select(-sampRpClust)
+  }
+  
+  # remove expression values from the data frame, unless returnExpressionZScores is TRUE
+  if(!isTRUE(returnExpressionZScores))
+    exprData <- exprData %>%
+    select(samp, cellSubset, any_of("metacluster"))
+  
+  # add the UMAP coordinates to the data frame
+  exprData <-
+    exprData %>%
+    bind_cols(
+      as.data.frame(umapRes$layout) %>%
+        setNames(paste0("UMAP", seq_len(ncol(umapRes$layout))))) %>%
+    as.data.frame()
+  
+  if(isTRUE(returnUmapObject)) {
+    # return the UMAP object
+    return(
+      list(data = exprData,
+           umapObject = umapRes))
+  } else {
+    # return the data frame with UMAP coordinates
+    return(exprData)
   }
 }

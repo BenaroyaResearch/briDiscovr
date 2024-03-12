@@ -1,7 +1,7 @@
 Package: briDiscovr
 Type: Package
 Title: Distribution analysis across clusters of a parent population overlaid with a rare subpopulation
-Version: 0.3.8
+Version: 0.3.9
 Authors@R: c(
   person("Mario", "Rosasco", role = c("aut")),
   person("Virginia", "Muir", role = c("aut")),
