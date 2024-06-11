@@ -797,6 +797,10 @@ runUmapDiscovrExperiment <- function(
           if (length(x) == 1) x else x[which(x != experiment$parentPopulation)[1]]}) %>%
       unlist()
   }
+
+  # check that downsample freq contains integers > 0
+  if(!all(downsampleFreq %% 1 == 0) | any(downsampleFreq <= 0))
+    stop("The input 'downsampleFreq' must consist of positive integers")
   
   # check that downsampleFreq is valid, and structure it as a named vector
   if(is.null(downsampleFreq)) {
@@ -862,12 +866,15 @@ runUmapDiscovrExperiment <- function(
           freq = downsampleFreq),
         by = "cellSubset") %>%
       group_by(samp, cellSubset) %>%
-      # keep 1 cell per freq; use remainder of 1 so that the first cell is retained
+      # keep 1 cell per freq; use remainder of 1 so that the first cell is retained if freq > 1
       mutate(sampCellSubsetIter = 1:n(),
-             freqRemainder = sampCellSubsetIter %% freq) %>%
-      dplyr::filter(freqRemainder == 1) %>%
+             freqRemainder = sampCellSubsetIter %% freq,
+             keepCell = case_when(freq == 1 ~ TRUE,
+                                  freqRemainder == 1 ~ TRUE,
+                                  freq > 1 & freqRemainder != 1 ~ FALSE)) %>% 
+      dplyr::filter(keepCell == TRUE) %>%
       ungroup() %>%
-      select(-freq, -freqRemainder, -sampCellSubsetIter)
+      select(-freq, -freqRemainder, -sampCellSubsetIter, -keepCell)
   }
   
   # run UMAP on the downsampled data
