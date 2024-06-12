@@ -215,6 +215,29 @@ makeMetaclusterHeatmaps(
 )
 ```
 
+### Heatmaps
+
+Once you've performed metaclustering, you can use the function `runUmapDiscovrExperiment()` to run UMAP on z-score normalized event marker values within each sample. It optionally downsamples the cells to speed the process. This function returns a data frame with the UMAP coordinates for each cell, as well as the original cell population, sample information, and metacluster if available. The outputs are intended to be visualized using plotting software such as ggplot2.
+
+```R
+umapObj <- runUmapDiscovrExperiment(
+  myExpt,
+  umapMarkers = NULL,
+  downsampleFreq = c(parentPopulation = 100, childPopulations = 1),
+  seed = NULL,
+  returnUmapObject = FALSE,
+  returnExpressionZScores = FALSE)
+
+#Plot the UMAP, color by metacluster
+
+umapObj %>%
+  ggplot(aes(x = UMAP1, 
+             y = UMAP2, 
+             color = metacluster)) +
+  geom_point()
+```
+
+
 ---
 
 ## Dependencies
