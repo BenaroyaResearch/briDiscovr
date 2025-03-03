@@ -7,7 +7,9 @@
 runUmapDiscovrExperiment(
   experiment,
   umapMarkers = NULL,
+  downsampleBy = "frequency",
   downsampleFreq = c(parentPopulation = 100, childPopulations = 1),
+  downsampleNumber = c(parentPopulation = 100, childPopulations = Inf),
   seed = NULL,
   returnUmapObject = FALSE,
   returnExpressionZScores = FALSE,
@@ -24,8 +26,19 @@ for each cell, its status must be "metaclustered".}
 the default value, NULL, the function extracts the set of markers from the
 "clusteringMarkers" element of the discovrExperiment object.}
 
+\item{downsampleBy}{character, specifying which downsampling method to use.
+Acceptable values are "frequency", "number", or unique partial matches.
+Defaults to "frequency" to replicate behavior of earlier versions. With
+method "frequency", the cells from each sample are trimmed to keep 1 cell
+for every N cells in the sample. With method "number", the cells are trimmed
+to keep up to N cells from each sample. If "frequency" is used, the
+"downsampleFreq" parameter is required and "downsampleNumber" will be
+ignored. Similarly, if "number" is used, the "downsampleNumber" parameter is
+required and "downsampleFreq" will be ignored.}
+
 \item{downsampleFreq}{numeric, specifying how to downsample the cells prior
-to running UMAP. Several alternative methods can be used by providing
+to running UMAP. This approach keeps 1 cell for every N total cells in each
+population in each sample. Several alternative methods can be used by providing
 different numeric vectors. If a single value is provided, all
 populations are downsampled to this frequency. If a vector of length 2 is
 provided (optionally with elements named "parentPopulation" and
@@ -40,6 +53,24 @@ all cells from child populations and subsets the parent population to 1/100.
 Note that downsampling is based on the order of the cells in
 discovrExperiment, so changes that alter the order of cells will make the
 downsampling results non-reproducible.}
+
+\item{downsampleNumber}{numeric, specifying how to downsample the cells
+prior to running UMAP. This approach keeps up to N cells for each population
+in each sample. Several alternative methods can be used by providing
+different numeric vectors. If a single value is provided, all populations
+are downsampled to this number of cells. If a vector of length 2 is provided
+(optionally with elements named "parentPopulation" and "childPopulations"),
+the "parentPopulation" or first element is used as the number for the parent
+population (extracted from the discovrExperiment object), and the
+"childPopulations" or second element is used as the number for the child
+populations. If a named vector is provided, the names must match the cell
+populations, and the values are the numbers to downsample each population
+to. If NULL, no downsampling is performed. To keep all cells in a population,
+set to Inf. The default is c("parentPopulation" = 100, "childPopulations" =
+Inf), which retains all cells from child populations and subsets the parent
+population to 100 cells. Note that downsampling is based on the order of the
+cells in discovrExperiment, so changes that alter the order of cells will
+make the downsampling results non-reproducible.}
 
 \item{seed}{(default: NULL) numeric, the seed to be passed to 
 \code{set.seed} to make the UMAP (more) reproducible. If NULL, no seed is set.}

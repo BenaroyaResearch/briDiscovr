@@ -717,8 +717,18 @@ downsampleFcsList <- function(
 #' @param umapMarkers A character vector, the markers to be used for UMAP. For
 #' the default value, NULL, the function extracts the set of markers from the
 #' "clusteringMarkers" element of the discovrExperiment object.
+#' @param downsampleBy character, specifying which downsampling method to use.
+#' Acceptable values are "frequency", "number", or unique partial matches.
+#' Defaults to "frequency" to replicate behavior of earlier versions. With
+#' method "frequency", the cells from each sample are trimmed to keep 1 cell
+#' for every N cells in the sample. With method "number", the cells are trimmed
+#' to keep up to N cells from each sample. If "frequency" is used, the
+#' "downsampleFreq" parameter is required and "downsampleNumber" will be
+#' ignored. Similarly, if "number" is used, the "downsampleNumber" parameter is
+#' required and "downsampleFreq" will be ignored.
 #' @param downsampleFreq numeric, specifying how to downsample the cells prior
-#' to running UMAP. Several alternative methods can be used by providing
+#' to running UMAP. This approach keeps 1 cell for every N total cells in each
+#' population in each sample. Several alternative methods can be used by providing
 #' different numeric vectors. If a single value is provided, all
 #' populations are downsampled to this frequency. If a vector of length 2 is
 #' provided (optionally with elements named "parentPopulation" and
@@ -733,6 +743,23 @@ downsampleFcsList <- function(
 #' Note that downsampling is based on the order of the cells in
 #' discovrExperiment, so changes that alter the order of cells will make the
 #' downsampling results non-reproducible.
+#' @param downsampleNumber numeric, specifying how to downsample the cells
+#' prior to running UMAP. This approach keeps up to N cells for each population
+#' in each sample. Several alternative methods can be used by providing
+#' different numeric vectors. If a single value is provided, all populations
+#' are downsampled to this number of cells. If a vector of length 2 is provided
+#' (optionally with elements named "parentPopulation" and "childPopulations"),
+#' the "parentPopulation" or first element is used as the number for the parent
+#' population (extracted from the discovrExperiment object), and the
+#' "childPopulations" or second element is used as the number for the child
+#' populations. If a named vector is provided, the names must match the cell
+#' populations, and the values are the numbers to downsample each population
+#' to. If NULL, no downsampling is performed. To keep all cells in a population,
+#' set to Inf. The default is c("parentPopulation" = 100, "childPopulations" =
+#' Inf), which retains all cells from child populations and subsets the parent
+#' population to 100 cells. Note that downsampling is based on the order of the
+#' cells in discovrExperiment, so changes that alter the order of cells will
+#' make the downsampling results non-reproducible.
 #' @param seed (default: NULL) numeric, the seed to be passed to 
 #' \code{set.seed} to make the UMAP (more) reproducible. If NULL, no seed is set.
 #' @param returnUmapObject (default: FALSE) logical, if TRUE, returns the full
@@ -758,7 +785,9 @@ downsampleFcsList <- function(
 runUmapDiscovrExperiment <- function(
     experiment,
     umapMarkers = NULL,
+    downsampleBy = "frequency",
     downsampleFreq = c("parentPopulation" = 100, "childPopulations" = 1),
+    downsampleNumber = c("parentPopulation" = 100, "childPopulations" = Inf),
     seed = NULL,
     returnUmapObject = FALSE,
     returnExpressionZScores = FALSE,
@@ -798,55 +827,116 @@ runUmapDiscovrExperiment <- function(
       unlist()
   }
 
-  # check that downsample freq contains integers > 0
-  if(!all(downsampleFreq %% 1 == 0) | any(downsampleFreq <= 0))
-    stop("The input 'downsampleFreq' must consist of positive integers")
-  
-  # check that downsampleFreq is valid, and structure it as a named vector
-  if(is.null(downsampleFreq)) {
-    # if downsampleFreq is NULL, no downsampling is performed
-    downsampleFreq <-
-      c("parentPopulation" = 1, "childPopulations" = 1)
-  } else if(!is.null(names(downsampleFreq))) {
-    if (!(setequal(names(downsampleFreq), c("parentPopulation", "childPopulations")) |
-          setequal(names(downsampleFreq), experiment$mergedExpr$cellSubset)))
-      stop(
-        paste0(
-          "If the input 'downsampleFreq' is a named vector, the names must ",
-          "match the values of cellSubset in the discovrExperiment object, or ",
-          "be named 'parentPopulation' and 'childPopulations'."))
-  } else if(is.numeric(downsampleFreq) && length(downsampleFreq) == 1) {
-    # if downsampleFreq is of length 1, it is used for both parent and child
-    downsampleFreq <-
-      c("parentPopulation" = downsampleFreq, "childPopulations" = downsampleFreq)
-  } else if(is.numeric(downsampleFreq) && length(downsampleFreq) == 2) {
-    # if downsampleFreq is of length 2, it is used for parent and child
-    if(setequal(names(downsampleFreq), c("parentPopulation", "childPopulations")))
+  # check that downsampleBy matches expected values
+  downsampleBy <- match.arg(downsampleBy, choices = c("frequency", "number"))
+
+  # fork downsampling based on downsampleBy
+  if (downsampleBy == "frequency") {
+    # run downsampling using downsampleFreq
+    
+    # check that downsampleFreq contains integers > 0
+    if(!all(downsampleFreq %% 1 == 0) | any(downsampleFreq <= 0))
+      stop("The input 'downsampleFreq' must consist of positive integers")
+    
+    # check that downsampleFreq is valid, and structure it as a named vector
+    if(is.null(downsampleFreq)) {
+      # if downsampleFreq is NULL, no downsampling is performed
       downsampleFreq <-
-        c("parentPopulation" = downsampleFreq[["parentPopulation"]],
-          "childPopulations" = downsampleFreq[["childPopulations"]])
-    downsampleFreq <-
-      c("parentPopulation" = downsampleFreq[[1]], "childPopulations" = downsampleFreq[[2]])
-  } else if(is.numeric(downsampleFreq) && length(downsampleFreq) > 2) {
-    # if downsampleFreq is of length > 2, it is used for each population
-    if(length(downsampleFreq) != length(unique(names(downsampleFreq))))
-      stop("The input 'downsampleFreq' contains duplicate names. Please provide a named vector with unique names.")
-    if(!setequal(names(downsampleFreq), experiment$mergedExpr$cellSubset))
-      stop("The input 'downsampleFreq' does not contain the same names as the cell populations in the 'mergedExpr' element of the discovrExperiment object.")
-  } else stop("The input 'downsampleFreq' is not valid. Please provide NULL or a numeric vector of length > 0.")
+        c("parentPopulation" = 1, "childPopulations" = 1)
+    } else if(!is.null(names(downsampleFreq))) {
+      if (!(setequal(names(downsampleFreq), c("parentPopulation", "childPopulations")) |
+            setequal(names(downsampleFreq), experiment$mergedExpr$cellSubset)))
+        stop(
+          paste0(
+            "If the input 'downsampleFreq' is a named vector, the names must ",
+            "match the values of cellSubset in the discovrExperiment object, or ",
+            "be named 'parentPopulation' and 'childPopulations'."))
+    } else if(is.numeric(downsampleFreq) && length(downsampleFreq) == 1) {
+      # if downsampleFreq is of length 1, it is used for both parent and child
+      downsampleFreq <-
+        c("parentPopulation" = downsampleFreq, "childPopulations" = downsampleFreq)
+    } else if(is.numeric(downsampleFreq) && length(downsampleFreq) == 2) {
+      # if downsampleFreq is of length 2, it is used for parent and child
+      if(setequal(names(downsampleFreq), c("parentPopulation", "childPopulations")))
+        downsampleFreq <-
+          c("parentPopulation" = downsampleFreq[["parentPopulation"]],
+            "childPopulations" = downsampleFreq[["childPopulations"]])
+      downsampleFreq <-
+        c("parentPopulation" = downsampleFreq[[1]], "childPopulations" = downsampleFreq[[2]])
+    } else if(is.numeric(downsampleFreq) && length(downsampleFreq) > 2) {
+      # if downsampleFreq is of length > 2, it is used for each population
+      if(length(downsampleFreq) != length(unique(names(downsampleFreq))))
+        stop("The input 'downsampleFreq' contains duplicate names. Please provide a named vector with unique names.")
+      if(!setequal(names(downsampleFreq), experiment$mergedExpr$cellSubset))
+        stop("The input 'downsampleFreq' does not contain the same names as the cell populations in the 'mergedExpr' element of the discovrExperiment object.")
+    } else stop("The input 'downsampleFreq' is not valid. Please provide NULL or a numeric vector of length > 0.")
+    
+    # standardize downsampleFreq to be a named vector with the same names as the cell populations
+    if(setequal(names(downsampleFreq), c("parentPopulation", "childPopulations"))) {
+      downsampleFreq <-
+        c(downsampleFreq[["parentPopulation"]],
+          rep(downsampleFreq[["childPopulations"]],
+              length(unique(experiment$mergedExpr$cellSubset)) - 1))
+      names(downsampleFreq) <-
+        c(experiment$parentPopulation,
+          setdiff(experiment$mergedExpr$cellSubset, experiment$parentPopulation))
+    }
   
-  # standardize downsampleFreq to be a named vector with the same names as the cell populations
-  if(setequal(names(downsampleFreq), c("parentPopulation", "childPopulations"))) {
-    downsampleFreq <-
-      c(downsampleFreq[["parentPopulation"]],
-        rep(downsampleFreq[["childPopulations"]],
-            length(unique(experiment$mergedExpr$cellSubset)) - 1))
-    names(downsampleFreq) <-
-      c(experiment$parentPopulation,
-        setdiff(experiment$mergedExpr$cellSubset, experiment$parentPopulation))
+    
+  } else if(downsampleBy == "number") {
+    # run downampling by downsampleNumber
+    
+    # check that downsampleNumber contains integers > 0 or Inf
+    if(!all((downsampleNumber %% 1 == 0) | (downsampleNumber == Inf)) | any(downsampleNumber <= 0))
+      stop("The input 'downsampleNumber' must consist of positive integers or infinity")
+    
+    # check that downsampleNumber is valid, and structure it as a named vector
+    if(is.null(downsampleNumber)) {
+      # if downsampleNumber is NULL, no downsampling is performed
+      downsampleNumber <-
+        c("parentPopulation" = Inf, "childPopulations" = Inf)
+    } else if(!is.null(names(downsampleNumber))) {
+      if (!(setequal(names(downsampleNumber), c("parentPopulation", "childPopulations")) |
+            setequal(names(downsampleNumber), experiment$mergedExpr$cellSubset)))
+        stop(
+          paste0(
+            "If the input 'downsampleNumber' is a named vector, the names must ",
+            "match the values of cellSubset in the discovrExperiment object, or ",
+            "be named 'parentPopulation' and 'childPopulations'."))
+    } else if(is.numeric(downsampleNumber) && length(downsampleNumber) == 1) {
+      # if downsampleNumber is of length 1, it is used for both parent and child
+      downsampleNumber <-
+        c("parentPopulation" = downsampleNumber, "childPopulations" = downsampleNumber)
+    } else if(is.numeric(downsampleNumber) && length(downsampleNumber) == 2) {
+      # if downsampleNumber is of length 2, it is used for parent and child
+      if(setequal(names(downsampleNumber), c("parentPopulation", "childPopulations")))
+        downsampleNumber <-
+          c("parentPopulation" = downsampleNumber[["parentPopulation"]],
+            "childPopulations" = downsampleNumber[["childPopulations"]])
+      downsampleNumber <-
+        c("parentPopulation" = downsampleNumber[[1]], "childPopulations" = downsampleNumber[[2]])
+    } else if(is.numeric(downsampleNumber) && length(downsampleNumber) > 2) {
+      # if downsampleNumber is of length > 2, it is used for each population
+      if(length(downsampleNumber) != length(unique(names(downsampleNumber))))
+        stop("The input 'downsampleNumber' contains duplicate names. Please provide a named vector with unique names.")
+      if(!setequal(names(downsampleNumber), experiment$mergedExpr$cellSubset))
+        stop("The input 'downsampleNumber' does not contain the same names as the cell populations in the 'mergedExpr' element of the discovrExperiment object.")
+    } else stop("The input 'downsampleNumber' is not valid. Please provide NULL or a numeric vector of length > 0.")
+    
+    # standardize downsampleNumber to be a named vector with the same names as the cell populations
+    if(setequal(names(downsampleNumber), c("parentPopulation", "childPopulations"))) {
+      downsampleNumber <-
+        c(downsampleNumber[["parentPopulation"]],
+          rep(downsampleNumber[["childPopulations"]],
+              length(unique(experiment$mergedExpr$cellSubset)) - 1))
+      names(downsampleNumber) <-
+        c(experiment$parentPopulation,
+          setdiff(experiment$mergedExpr$cellSubset, experiment$parentPopulation))
+    }
   }
   
   # extract the cell populations and the merged expression matrix, z-score the data
+  # this is run after the initial downsampling steps so that it doesn't run if there's anything wrong with the downsampling inputs
   exprData <-
     experiment$mergedExpr %>%
     dplyr::select(samp, cellSubset, any_of("sampRpClust"), all_of(umapMarkers)) %>%
@@ -856,25 +946,68 @@ runUmapDiscovrExperiment <- function(
              .fns = ~ scale(.x, center = TRUE, scale = TRUE)[,1])) %>%
     ungroup()
   
-  # downsample the data, keeping 1 cell per downsamplefreq
-  if(any(downsampleFreq > 1)) {
-    exprData <-
-      exprData %>%
-      left_join(
-        data.frame(
-          cellSubset = names(downsampleFreq),
-          freq = downsampleFreq),
-        by = "cellSubset") %>%
-      group_by(samp, cellSubset) %>%
-      # keep 1 cell per freq; use remainder of 1 so that the first cell is retained if freq > 1
-      mutate(sampCellSubsetIter = 1:n(),
-             freqRemainder = sampCellSubsetIter %% freq,
-             keepCell = case_when(freq == 1 ~ TRUE,
-                                  freqRemainder == 1 ~ TRUE,
-                                  freq > 1 & freqRemainder != 1 ~ FALSE)) %>% 
-      dplyr::filter(keepCell == TRUE) %>%
-      ungroup() %>%
-      select(-freq, -freqRemainder, -sampCellSubsetIter, -keepCell)
+  # downsample the data
+  
+  if(downsampleBy == "frequency") {
+    # run downampling by downsampleFreq
+  
+    # downsample the data, keeping 1 cell per downsamplefreq
+    if(any(downsampleFreq > 1)) {
+      exprData <-
+        exprData %>%
+        left_join(
+          data.frame(
+            cellSubset = names(downsampleFreq),
+            freq = downsampleFreq),
+          by = "cellSubset") %>%
+        group_by(samp, cellSubset) %>%
+        # keep 1 cell per freq; use remainder of 1 so that the first cell is retained if freq > 1
+        mutate(sampCellSubsetIter = 1:n(),
+               freqRemainder = sampCellSubsetIter %% freq,
+               keepCell = case_when(freq == 1 ~ TRUE,
+                                    freqRemainder == 1 ~ TRUE,
+                                    freq > 1 & freqRemainder != 1 ~ FALSE)) %>% 
+        dplyr::filter(keepCell == TRUE) %>%
+        ungroup() %>%
+        select(-freq, -freqRemainder, -sampCellSubsetIter, -keepCell)
+    }
+    
+  } else if(downsampleBy == "number") {
+    # run downampling by downsampleNumber
+    
+    # downsample the data, keeping N cells per population/sample
+    if(any(downsampleNumber < Inf)) {
+      # create a data frame with the rows to keep (a little clunky but much more efficient than other options I tried)
+      exprDataCellsToKeepBySampCellSubset <-
+        exprData %>%
+        left_join(
+          data.frame(
+            cellSubset = names(downsampleNumber),
+            nCellsToKeep = downsampleNumber),
+          by = "cellSubset") %>%
+        group_by(samp, cellSubset, nCellsToKeep) %>%
+        # set nCellsToKeep to be not more than the number of cells
+        summarize(nCellsBySampCellSubset = n()) %>%
+        mutate(nCellsToKeep = min(nCellsToKeep, nCellsBySampCellSubset)) %>%
+        ungroup()
+      exprDataCellsToKeepBySampCellSubset[["rowNumberBySampCellSubset"]] <-
+        mapply(\(nCellsBySampCellSubset, nCellsToKeep) round(seq(from = 1, to = nCellsBySampCellSubset, length.out = nCellsToKeep)),
+               exprDataCellsToKeepBySampCellSubset$nCellsBySampCellSubset, exprDataCellsToKeepBySampCellSubset$nCellsToKeep)
+      exprDataCellsToKeepBySampCellSubset <-
+        unnest(exprDataCellsToKeepBySampCellSubset, cols = rowNumberBySampCellSubset) %>%
+        mutate(keepCell = TRUE)
+
+      # filter the expression data
+      exprData <-
+        exprData %>%
+        group_by(samp, cellSubset) %>%
+        mutate(rowNumberBySampCellSubset = row_number()) %>%
+        ungroup() %>%
+        # merge in rows to keep
+        left_join(exprDataCellsToKeepBySampCellSubset, by = c("samp", "cellSubset", "rowNumberBySampCellSubset")) %>%
+        dplyr::filter(keepCell == TRUE) %>%
+        select(-rowNumberBySampCellSubset, -nCellsToKeep, -nCellsBySampCellSubset, -keepCell)
+    }
   }
   
   # run UMAP on the downsampled data
