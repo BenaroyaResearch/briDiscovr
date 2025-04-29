@@ -218,14 +218,17 @@ metaclusterDiscovrExperiment <- function(
     tibble::column_to_rownames("marker")
 
   # use ComplexHeatmap as a convenient way of applying metaclustering
-  metaxHeatmap <- ComplexHeatmap::Heatmap(
-    as.matrix(allSubsetAllSubjectZscores[metaclusterMarkers,]),
-    clustering_method_columns = linkage,
-    clustering_distance_columns = distance,
-    clustering_method_rows = linkage,
-    clustering_distance_rows = distance
-  )
-
+  metaxHeatmap <- 
+    suppressMessages(  # suppress default messages from Heatmap
+      ComplexHeatmap::Heatmap(
+        as.matrix(allSubsetAllSubjectZscores[metaclusterMarkers,]),
+        clustering_method_columns = linkage,
+        clustering_distance_columns = distance,
+        clustering_method_rows = linkage,
+        clustering_distance_rows = distance
+      )
+    )
+  
   # cut the heatmap dendrogram to get phenotypic metaclusters
   clusterDendrogram <- as.hclust(ComplexHeatmap::column_dend(metaxHeatmap))
   colIndices <- cutree(
@@ -336,14 +339,17 @@ recutMetaclusters <- function(
   }
 
   # use ComplexHeatmap as a convenient way of applying metaclustering
-  metaxHeatmap <- ComplexHeatmap::Heatmap(
-    as.matrix(experiment$allSubsetAllSubjectZscores[experiment$metaclusterMarkers,]),
-    clustering_method_columns = linkage,
-    clustering_distance_columns = distance,
-    clustering_method_rows = linkage,
-    clustering_distance_rows = distance
-  )
-
+  metaxHeatmap <-
+    suppressMessages(  # suppress default messages from Heatmap
+      ComplexHeatmap::Heatmap(
+        as.matrix(experiment$allSubsetAllSubjectZscores[experiment$metaclusterMarkers,]),
+        clustering_method_columns = linkage,
+        clustering_distance_columns = distance,
+        clustering_method_rows = linkage,
+        clustering_distance_rows = distance
+      )
+    )
+  
   # cut the heatmap dendrogram to get phenotypic metaclusters
   clusterDendrogram <- as.hclust(ComplexHeatmap::column_dend(metaxHeatmap))
   colIndices <- cutree(
