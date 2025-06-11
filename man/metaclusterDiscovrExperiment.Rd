@@ -27,7 +27,7 @@ to exclude from further analysis. Note that the convenience function
 from analysis. Note that printing the experiment object will display a list of all
 markers. By default all clustering markers will be included. (default: NA)}
 
-\item{pctInClusterThreshold}{A numeric indicating a percentage. Cluster with event
+\item{pctInClusterThreshold}{A numeric indicating a percentage. Clusters with event
 occupancy below this threshold will be considered 'low-abundance' and will be
 dropped from further analysis (default: 1)}
 

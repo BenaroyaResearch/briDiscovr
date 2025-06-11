@@ -46,7 +46,7 @@
 #' @import flowCore
 #' @import dplyr
 #' @importFrom methods as
-#' @importFrom stats setNames
+#' @importFrom stats setNames na.omit
 #' @importFrom utils read.csv
 #' @importFrom memuse Sys.meminfo mu.size
 #' @export
@@ -103,6 +103,7 @@ setupDiscovrExperiment <- function(
 
   # get list of FCS files with subject and cell subset information, run checks on this input and the FCS files
   fcsInfo <- read.csv(fcsInfoFile, stringsAsFactors = FALSE)
+  gc() # run garbage collection before memory check, to clean up unused memory
   checkFcsFiles(fcsInfo, checkMemory = checkMemory, verbose = verbose)
   
   # if input includes non-null downsampleVectorList, check that it has one entry for each FCS files
@@ -138,33 +139,28 @@ setupDiscovrExperiment <- function(
   # Section 2.c.i-iii from original SOP load and format input
   ###########################################################
 
-  # Read in FCS files and associate with cell subsets and subjects
-  for (currCellSubset in unique(fcsInfo$cellSubset)){
-    if(verbose){message(paste0("Assigning per-subject data for subset: ", currCellSubset, "..."))}
-    currFcsList <-
-      buildFcsList(fcsInfo %>% dplyr::filter(.data$cellSubset == currCellSubset), truncate_max_range = FALSE)
+  ## Read in FCS files and associate with cell subsets and subjects
+  # this code uses a single object that is modified rather than copied to avoid duplicating large chunks of data
+  # if this is not the most efficient way to handle memory here, then we should change it
+  # intent is to clean up garbage as we go and limit the max memory requirement
+  fcsListBySubjectCellSubset <- list()
+  for (currSubject in unique(fcsInfo$subject)){
+    if(verbose){message(paste0("Assigning per-subset data for sample: ", currSubject, "..."))}
+    fcsListBySubjectCellSubset[[currSubject]] <-
+      buildFcsList(
+        fcsInfo %>% dplyr::filter(subject == currSubject), indexField = "cellSubset", truncate_max_range = FALSE)
+    # downsample each flowFrame within the FCSList for each subject
     if(!is.null(downsampleVectorList)) {
       currDownsampleVectorList <-
-        downsampleVectorList[which(fcsInfo$cellSubset == currCellSubset)]
-      for(currFcsNum in seq_len(length(currFcsList)))
+        downsampleVectorList[which(fcsInfo$subject == currSubject)]
+      for(currFcsNum in seq_len(length(fcsListBySubjectCellSubset[[currSubject]])))
         if(!identical(currDownsampleVectorList[[currFcsNum]], "all")) # skip downsampling if "all" rows specified
-          currFcsList[[currFcsNum]] <-
-            currFcsList[[currFcsNum]][currDownsampleVectorList[[currFcsNum]],]
+          fcsListBySubjectCellSubset[[currSubject]][[currFcsNum]] <-
+            fcsListBySubjectCellSubset[[currSubject]][[currFcsNum]][currDownsampleVectorList[[currFcsNum]],]
     }
-    assign(currCellSubset, currFcsList)
-  }
-  allSubjects <-
-    buildFcsList(fcsInfo[fcsInfo$cellSubset == parentPopulation,], truncate_max_range = FALSE)
-  if(!is.null(downsampleVectorList)) {
-    currDownsampleVectorList <-
-      downsampleVectorList[which(fcsInfo$cellSubset == parentPopulation)]
-    for(currFcsNum in seq_len(length(allSubjects)))
-      if(!identical(currDownsampleVectorList[[currFcsNum]], "all")) # skip downsampling if "all" rows specified
-      allSubjects[[currFcsNum]] <-
-        allSubjects[[currFcsNum]][currDownsampleVectorList[[currFcsNum]],]
   }
   
-  # Process data
+  # Process FCSList objects to ensure that all data include all required markers with correct names
   processData <- function(fcs){
     # confirm that all markers to be used in clustering are mappable to fcs parameter names
     clusteringMarkerDesc <- markerInfo[markerInfo$useToCluster, "fcsMarkerName", drop = TRUE]
@@ -191,33 +187,48 @@ setupDiscovrExperiment <- function(
 
     # This changes parameters(fcs)$name, featureNames(fcs), and colnames(fcs) - aka events colnames - all in one fell swoop.
     # note colnames has to be the one from flowCore
-    flowCore::colnames(fcs) = make.names(pData(parameters(fcs))$desc)
+    flowCore::colnames(fcs) <- make.names(pData(parameters(fcs))$desc)
 
     # Remove markers that aren't informative/shared between panels (i.e. duplicated NAs)
-    fcs = fcs[,!(duplicated(flowCore::colnames(fcs)) | duplicated(flowCore::colnames(fcs), fromLast = TRUE))]
-    fcs = fcs[, order(flowCore::colnames(fcs))]
+    fcs <- fcs[,!(duplicated(flowCore::colnames(fcs)) | duplicated(flowCore::colnames(fcs), fromLast = TRUE))]
+    fcs <- fcs[, order(flowCore::colnames(fcs))]
   }
 
   if(verbose){message("Cleaning and selecting markers from .fcs files according to markerInfo file...")}
 
-  for (currCellSubset in unique(fcsInfo$cellSubset)){
-    tmpFile <- get(currCellSubset)
-    tmpFile <- lapply(tmpFile, processData)
-    assign(currCellSubset, tmpFile)
+  for (currSubject in names(fcsListBySubjectCellSubset)){
+    fcsListBySubjectCellSubset[[currSubject]] <-
+      lapply(fcsListBySubjectCellSubset[[currSubject]], processData)
   }
-  allSubjects <- lapply(allSubjects, processData)
 
   if(verbose){message("Merging data (parent and child populations)...")}
-  allMerged = allSubjects
-  for(currSubject in names(allSubjects)){
-    exprs(allMerged[[currSubject]]) = exprs(allMerged[[currSubject]])[0,]
-    for(cellSubset in unique(fcsInfo$cellSubset)){
-      exprs(allMerged[[currSubject]]) = rbind(
-        exprs(allMerged[[currSubject]]),
-        if(!is.null(get(cellSubset)[[currSubject]])) exprs(get(cellSubset)[[currSubject]])
-      )
-    }
+  cellSubsetNames <- c(parentPopulation, setdiff(unique(fcsInfo$cellSubset), parentPopulation))
+  # store the cell subset row counts for each subject's data (for use later in building mergedExpr)
+  cellSubsetCountsBySubject <-
+    lapply(fcsListBySubjectCellSubset,
+           \(x) sapply(x[na.omit(match(cellSubsetNames, names(x)))], nrow, USE.NAMES = TRUE))
+  
+  # create object to store data merged by subject
+  fcsListBySubjectMerged <- list()
+  for(currSubject in names(fcsListBySubjectCellSubset)){
+    # start with parentPopulation
+    fcsListBySubjectMerged[[currSubject]] <- fcsListBySubjectCellSubset[[currSubject]][[parentPopulation]]
+    # merge values into parent population, in same order
+    exprs(fcsListBySubjectMerged[[currSubject]]) <-
+      rbind(
+        exprs(fcsListBySubjectMerged[[currSubject]]),
+        do.call(
+          rbind,
+          lapply(
+            fcsListBySubjectCellSubset[[currSubject]][
+              na.omit(
+                match(setdiff(cellSubsetNames, parentPopulation),
+                      names(fcsListBySubjectCellSubset[[currSubject]]))
+              )],
+            exprs)))
   }
+  # remove previous large data object and do a garbage cleanup
+  rm(fcsListBySubjectCellSubset); gc()
 
   # Transform the data
   asinhTfmData <- function(fcs){
@@ -225,40 +236,37 @@ setupDiscovrExperiment <- function(
     tl <- transformList(
       flowCore::colnames(fcs),
       arcsinhTransform(a = arcsinhA, b = arcsinhB, c = arcsinhC),
-      transformationId="asinh"
+      transformationId = "asinh"
     )
-    fcs = transform(fcs, tl)
+    fcs <- flowCore::transform(fcs, tl)
   }
 
+  # transform and convert object to a flowSet for easier use downstream
   if(verbose){
     message("Transforming data using arcsinh(a=", arcsinhA, ", b=", arcsinhB, ", c=", arcsinhC, ")...")
   }
-  allDataTransformed <- lapply(allMerged, asinhTfmData)
-  transformedFlowSet <- as(allDataTransformed, "flowSet")
-  # remove old data to conserve memory
-  rm(allDataTransformed)
-
+  fcsListBySubjectMerged <- as(lapply(fcsListBySubjectMerged, asinhTfmData), "flowSet")
+  
   # Extract expression data and label Tmr+ events
-  mergedExpr <- setNames(
-    data.frame(matrix(ncol = ncol(exprs(transformedFlowSet[[1]]))+2, nrow = 0)),
-    c(flowCore::colnames(transformedFlowSet), "samp", "cellSubset")
-  )
-
-  for(currSubject in names(allSubjects)){
-    tmpExpr = as.data.frame(flowCore::exprs(transformedFlowSet[[currSubject]]))
-    tmpExpr$samp = as.character(currSubject)
-    temp_cellSubsets <- list()
-    for(cellSubset in unique(fcsInfo$cellSubset)){
-      temp_cellSubsets <- c(
-        temp_cellSubsets,
-        if(!is.null(get(cellSubset)[[currSubject]])){
-          rep(paste0(cellSubset), nrow(flowCore::exprs(get(cellSubset)[[currSubject]])))
-        }
-      )
-    }
-    tmpExpr$cellSubset = temp_cellSubsets
-    mergedExpr = rbind(mergedExpr, tmpExpr)
+  mergedExprStructureOnly <-
+    setNames(
+      data.frame(matrix(data = NA_real_, ncol = ncol(exprs(fcsListBySubjectMerged[[1]])), nrow = 0)),
+      flowCore::colnames(fcsListBySubjectMerged))
+  mergedExprStructureOnly$samp <- character()
+  mergedExprStructureOnly$cellSubset <- list()
+  # mergedExprStructureOnly$cellSubset <- character() # potential future change: make cellSubset a character vector
+  
+  mergedExpr <- list()
+  for(currSubjectNum in seq_len(length(fcsListBySubjectMerged))){
+    mergedExpr[[currSubjectNum]] <- as.data.frame(flowCore::exprs(fcsListBySubjectMerged[[currSubjectNum]]))
+    mergedExpr[[currSubjectNum]]$samp <- as.character(names(cellSubsetCountsBySubject)[currSubjectNum])
+    # potential future change: make cellSubset a character vector; remove the as.list() from following lines
+    mergedExpr[[currSubjectNum]]$cellSubset <-
+      as.list(
+        rep(names(cellSubsetCountsBySubject[[currSubjectNum]]), times = cellSubsetCountsBySubject[[currSubjectNum]]))
   }
+  mergedExpr <- bind_rows(mergedExprStructureOnly, mergedExpr)
+  rm(fcsListBySubjectMerged); gc()
 
   # building a discovr experiment S3 object
   exptInProgress <- structure(list(), class = "discovrExperiment")
@@ -270,7 +278,7 @@ setupDiscovrExperiment <- function(
   exptInProgress$mergedExpr         <- mergedExpr
   exptInProgress$clusteringMarkers  <- clusteringMarkers
   exptInProgress$status             <- "initialized"
-
+  
   return(exptInProgress)
 }
 
@@ -287,9 +295,8 @@ setupDiscovrExperiment <- function(
 #' @seealso \code{\link{setupDiscovrExperiment}} \code{\link{discovrExperiment}}
 #' @author Mario G Rosasco, Virginia Muir
 #' @import dplyr
-#' @importFrom rlang .data
 #' @importFrom flowCore exprs
-#' @importFrom igraph graph.data.frame cluster_louvain membership modularity
+#' @importFrom igraph graph_from_data_frame cluster_louvain membership modularity
 #' @export
 clusterDiscovrExperiment <- function(
   experiment,
@@ -333,7 +340,7 @@ clusterDiscovrExperiment <- function(
     return(nearest[[1]])
   }
 
-  runRpheno <- function(data, k=30){
+  runRpheno <- function(data, k = 30){
     nDigits <- 3 # set number of digits for time display
     if(is.data.frame(data))
       data <- as.matrix(data)
@@ -374,7 +381,7 @@ clusterDiscovrExperiment <- function(
     links <- links[links[,1]>0, ]
     relations <- as.data.frame(links)
     colnames(relations)<- c("from","to","weight")
-    t3 <- system.time(g <- igraph::graph.data.frame(relations, directed=FALSE))
+    t3 <- system.time(g <- igraph::graph_from_data_frame(relations, directed=FALSE))
 
     if(verbose){
       message(
@@ -409,7 +416,7 @@ clusterDiscovrExperiment <- function(
       if(verbose){
         message("\nClustering sample ", match(currSubj, allSubjects), " of ", length(allSubjects), "...")
       }
-      rPhenoVect = as.numeric(igraph::membership(runRpheno(
+      rPhenoVect <- as.numeric(igraph::membership(runRpheno(
         data = experiment$mergedExpr[
           experiment$mergedExpr$samp == currSubj,
           experiment$clusteringMarkers
@@ -435,54 +442,52 @@ clusterDiscovrExperiment <- function(
   ###################################################################
   # Calculate mean expression value of each marker for each phenograph cluster in each subject
   clusterMeans <- experiment$mergedExpr %>%
-    dplyr::select(-.data$cellSubset) %>%
-    unique() %>% # remove duplicated rows; mergedExpr has both parent and gated
-    dplyr::group_by(.data$samp, .data$RPclust) %>%
+    dplyr::select(-cellSubset) %>%
+    distinct() %>% # remove duplicated rows; mergedExpr has both parent and gated
+    dplyr::group_by(samp, RPclust) %>%
     dplyr::summarise_all(mean) %>%
-    dplyr::mutate(RPclust = as.character(.data$RPclust))
+    dplyr::mutate(RPclust = as.character(RPclust))
 
   ##################################
   # Calculate total mean expression for each subject
-  parentMeans = experiment$mergedExpr %>%
-    dplyr::select(-.data$cellSubset, -.data$RPclust) %>%
-    unique() %>% # remove duplicated rows; mergedExpr has both parent and gated
-    dplyr::group_by(.data$samp) %>%
+  parentMeans <- experiment$mergedExpr %>%
+    dplyr::select(-cellSubset, -RPclust) %>%
+    distinct() %>% # remove duplicated rows; mergedExpr has both parent and gated
+    dplyr::group_by(samp) %>%
     dplyr::summarise_all(mean) %>%
     dplyr::mutate(RPclust = "Total_Parent")
-
-  experiment$clusterMeans <- bind_rows(clusterMeans, parentMeans)
 
   # Count cells of each subpopulation (eg Tmr) in each phenograph cluster (from each sample)
   clusterRarePopCts <-
     experiment$mergedExpr %>%
-    dplyr::select(.data$samp, .data$cellSubset, .data$RPclust) %>%
-    dplyr::group_by(.data$samp, .data$RPclust) %>%
-    dplyr::summarise(Total=n(), .groups = "drop_last") %>%
+    dplyr::select(samp, cellSubset, RPclust) %>%
+    dplyr::group_by(samp, RPclust) %>%
+    dplyr::summarise(Total = n(), .groups = "drop_last") %>%
     as.data.frame()
 
   uniqueSubsets <- unique(experiment$mergedExpr$cellSubset)
 
   for(currCellSubset in uniqueSubsets){
     if(verbose){message("Counting cluster events for ", currCellSubset)}
-    additionalMatrix = experiment$mergedExpr %>%
-      dplyr::select(.data$samp, .data$cellSubset, .data$RPclust) %>%
-      group_by(.data$samp, .data$RPclust) %>%
-      summarise(number = sum(.data$cellSubset == currCellSubset)) %>%
+    additionalMatrix <- experiment$mergedExpr %>%
+      dplyr::select(samp, cellSubset, RPclust) %>%
+      group_by(samp, RPclust) %>%
+      summarise(number = sum(cellSubset == currCellSubset)) %>%
       as.data.frame()
     clusterRarePopCts <- cbind(clusterRarePopCts, additionalMatrix$number)
   }
 
   for(i in seq_len(ncol(clusterRarePopCts)-3)){
-    colnames(clusterRarePopCts)[i+3] = (uniqueSubsets)[i]
+    colnames(clusterRarePopCts)[i+3] <- (uniqueSubsets)[i]
   }
 
-  aggregateCounts = clusterRarePopCts %>%
-    dplyr::select(-.data$RPclust) %>%
-    group_by(.data$samp) %>%
+  aggregateCounts <- clusterRarePopCts %>%
+    dplyr::select(-RPclust) %>%
+    group_by(samp) %>%
     summarise_all(sum) %>%
-    rename_at(vars(-.data$samp),function(name) paste0(name,"_tot"))
+    rename_at(vars(-samp), function(name) paste0(name,"_tot"))
 
-  clusterRarePopCts = left_join(clusterRarePopCts, aggregateCounts)
+  clusterRarePopCts <- left_join(clusterRarePopCts, aggregateCounts)
 
   for(i in seq_len(length(uniqueSubsets)+1)){
     clusterRarePopCts <- cbind(
@@ -492,12 +497,13 @@ clusterDiscovrExperiment <- function(
   }
 
   for(i in seq_len(length(uniqueSubsets))){
-    colnames(clusterRarePopCts)[i+3+(length(uniqueSubsets)+1)*2]= (paste0("pct_", (uniqueSubsets)[i], "_in_clust"))
+    colnames(clusterRarePopCts)[i+3+(length(uniqueSubsets)+1)*2] <- (paste0("pct_", (uniqueSubsets)[i], "_in_clust"))
   }
-  colnames(clusterRarePopCts)[3+(length(uniqueSubsets)+1)*2]= "pct_Total_in_clust"
+  colnames(clusterRarePopCts)[3+(length(uniqueSubsets)+1)*2] <- "pct_Total_in_clust"
 
   # update experiment data
   experiment$status             <- "clustered"
+  experiment$clusterMeans       <- bind_rows(clusterMeans, parentMeans)
   experiment$clusterMethod      <- method
   experiment$clusterRarePopCts  <- clusterRarePopCts
 
