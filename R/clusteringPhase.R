@@ -1,4 +1,4 @@
-## Copyright (C) 2020  Mario Rosasco and Benaroya Research Institute
+## Copyright (C) 2025  Matt Dufort, Mario Rosasco, Virginia Muir, and Benaroya Research Institute
 ##
 ## This file is part of the briDiscovr package
 
@@ -8,11 +8,18 @@
 #' object for analysis. Default parameters values are based on the original DISCOV-R
 #' analysis published in Wiedeman et al 2020.
 #'
-#' @param markerInfoFile A character string indicating the path to a .csv file. This file is expected to have columns
-#' named useToCluster", as well as the names specified in the \code{markerCommonField} and \code{markerFcsField} variables.
-#' Details of the \code{markerCommonField} and \code{markerFcsField} arguments are provided below; the "useToCluster"
-#' column should have only TRUE or FALSE values. Markers with a TRUE value in this column will be used for clustering,
-#' whereas the others will not.
+#' @param markerInfoFile A character string indicating the path to a .csv file.
+#' This file is expected to have columns named useToCluster", as well as the
+#' names specified in the \code{markerCommonField} and \code{markerFcsField}
+#' variables. Details of the \code{markerCommonField} and \code{markerFcsField}
+#' arguments are provided below; the "useToCluster" column should have only TRUE
+#' or FALSE values. Markers with a TRUE value in this column will be used for
+#' clustering, whereas the others will not. An optional
+#' \code{normalizationMethod} can be included to specify the type of
+#' normalization to be used for each marker; options are "zScore", "none", and
+#' "warpSet". In addition, "warpSet" can include a peak number specification as
+#' a number immediately following (e.g. "warpSet2"). Normalization defaults to
+#' "zScore" for each and all markers if not specified.
 #' @param fcsInfoFile A character string indicating the path to a file containing columns named "subject",
 #' "cellSubset", and "filename". The "filename" field must contain paths to the .fcs files that will be used in analysis.
 #' @param parentPopulation A character sting indicating the name of the parent population subset. Must match
@@ -64,7 +71,7 @@ setupDiscovrExperiment <- function(
   downsampleVectorList = NULL
 ){
   # get marker info, and check for appropriate columns
-  markerInfo <- read.csv(markerInfoFile, stringsAsFactors = FALSE)
+  markerInfo <- read.csv(markerInfoFile, na.strings = c("NA", ""), stringsAsFactors = FALSE)
   if(!all(c(markerCommonField, markerFcsField, "useToCluster") %in% names(markerInfo))){
     stop(
       "The file set as 'markerInfoFile' must contain columns with names 'useToCluster' and the names ",
@@ -86,6 +93,9 @@ setupDiscovrExperiment <- function(
   if(any(markerInfo$commonMarkerName == "")){
     stop("Markers without assigned names were detected in the markerInfo file. Please correct the file and try again.")
   }
+
+  # check normalizationMethod, and set to zScore if not present
+  markerInfo <- checkMarkerInfoNormalizationMethod(markerInfo)
 
   # if input includes non-null downsampleVectorList, check that it is valid
   if(!is.null(downsampleVectorList)) {
@@ -159,46 +169,12 @@ setupDiscovrExperiment <- function(
             fcsListBySubjectCellSubset[[currSubject]][[currFcsNum]][currDownsampleVectorList[[currFcsNum]],]
     }
   }
-  
-  # Process FCSList objects to ensure that all data include all required markers with correct names
-  processData <- function(fcs){
-    # confirm that all markers to be used in clustering are mappable to fcs parameter names
-    clusteringMarkerDesc <- markerInfo[markerInfo$useToCluster, "fcsMarkerName", drop = TRUE]
-    missingMarkers <- clusteringMarkerDesc[!clusteringMarkerDesc %in% pData(parameters(fcs))$desc]
-    
-    # check for missingMarkers in name field of flowFrame parameters, where desc is empty
-    missingMarkersToRename <- intersect(missingMarkers, pData(parameters(fcs))$name)
-    missingMarkersToRename <-
-      missingMarkersToRename[
-        is.na(pData(parameters(fcs))$desc[match(missingMarkersToRename, pData(parameters(fcs))$name)])]
-    if (length(missingMarkersToRename) > 0){
-      pData(parameters(fcs))$desc[match(missingMarkers, pData(parameters(fcs))$name)] <-
-        missingMarkersToRename
-    }
-    missingMarkers <- setdiff(missingMarkers, missingMarkersToRename)
-    
-    if(length(missingMarkers) > 0){
-      stop("Could not find the following clustering markers in the .fcs data\n", paste0(missingMarkers, collapse = ", "))
-    }
-
-    # Tidy marker names
-    pData(parameters(fcs))$desc <-
-      markerInfo$commonMarkerName[match(pData(parameters(fcs))$desc, markerInfo$fcsMarkerName)]
-
-    # This changes parameters(fcs)$name, featureNames(fcs), and colnames(fcs) - aka events colnames - all in one fell swoop.
-    # note colnames has to be the one from flowCore
-    flowCore::colnames(fcs) <- make.names(pData(parameters(fcs))$desc)
-
-    # Remove markers that aren't informative/shared between panels (i.e. duplicated NAs)
-    fcs <- fcs[,!(duplicated(flowCore::colnames(fcs)) | duplicated(flowCore::colnames(fcs), fromLast = TRUE))]
-    fcs <- fcs[, order(flowCore::colnames(fcs))]
-  }
 
   if(verbose){message("Cleaning and selecting markers from .fcs files according to markerInfo file...")}
 
   for (currSubject in names(fcsListBySubjectCellSubset)){
     fcsListBySubjectCellSubset[[currSubject]] <-
-      lapply(fcsListBySubjectCellSubset[[currSubject]], processData)
+      lapply(fcsListBySubjectCellSubset[[currSubject]], processFcsList, markerInfo = markerInfo)
   }
 
   if(verbose){message("Merging data (parent and child populations)...")}
@@ -269,17 +245,17 @@ setupDiscovrExperiment <- function(
   rm(fcsListBySubjectMerged); gc()
 
   # building a discovr experiment S3 object
-  exptInProgress <- structure(list(), class = "discovrExperiment")
-  exptInProgress$markerInfoFile     <- markerInfoFile
-  exptInProgress$markerInfo         <- markerInfo
-  exptInProgress$fcsInfoFile        <- fcsInfoFile
-  exptInProgress$fcsInfo            <- fcsInfo
-  exptInProgress$parentPopulation   <- parentPopulation
-  exptInProgress$mergedExpr         <- mergedExpr
-  exptInProgress$clusteringMarkers  <- clusteringMarkers
-  exptInProgress$status             <- "initialized"
+  experiment <- structure(list(), class = "discovrExperiment")
+  experiment$markerInfoFile     <- markerInfoFile
+  experiment$markerInfo         <- markerInfo
+  experiment$fcsInfoFile        <- fcsInfoFile
+  experiment$fcsInfo            <- fcsInfo
+  experiment$parentPopulation   <- parentPopulation
+  experiment$mergedExpr         <- mergedExpr
+  experiment$clusteringMarkers  <- clusteringMarkers
+  experiment$status             <- "initialized"
   
-  return(exptInProgress)
+  return(experiment)
 }
 
 #' Perform phenograph clustering for a DISCOV-R experiment
@@ -436,10 +412,11 @@ clusterDiscovrExperiment <- function(
   } else {
     stop("Clustering method '", method, "' is not currently supported. Stopping...")
   }
-
+  
   ###################################################################
   # Sections 2.e.i from original SOP - Summarize and save outputs
   ###################################################################
+  
   # Calculate mean expression value of each marker for each phenograph cluster in each subject
   clusterMeans <- experiment$mergedExpr %>%
     dplyr::select(-cellSubset) %>%
@@ -447,6 +424,7 @@ clusterDiscovrExperiment <- function(
     dplyr::group_by(samp, RPclust) %>%
     dplyr::summarise_all(mean) %>%
     dplyr::mutate(RPclust = as.character(RPclust))
+  
 
   ##################################
   # Calculate total mean expression for each subject
@@ -502,10 +480,246 @@ clusterDiscovrExperiment <- function(
   colnames(clusterRarePopCts)[3+(length(uniqueSubsets)+1)*2] <- "pct_Total_in_clust"
 
   # update experiment data
-  experiment$status             <- "clustered"
-  experiment$clusterMeans       <- bind_rows(clusterMeans, parentMeans)
-  experiment$clusterMethod      <- method
-  experiment$clusterRarePopCts  <- clusterRarePopCts
+  experiment$status                        <- "clustered"
+  experiment$clusterMeans                  <- bind_rows(clusterMeans, parentMeans)
+  experiment$clusterMethod                 <- method
+  experiment$clusterRarePopCts             <- clusterRarePopCts
 
+  return(experiment)
+}
+
+#' Normalize marker expression within a DISCOV-R experiment
+#'
+#' @param experiment A discovrExperiment created using
+#' \code{setupDiscovrExperiment()} and clustered using
+#' \code{clusterDiscovrExperiment()}
+#' @param normalizationInfo (default: NULL) Optional object containing
+#' information on how to normalize. If left NULL, the \code{experiment} object
+#' will be checked for normalization info in
+#' \code{experiment$markerInfo$normalizationMethod}. If that is not present,
+#' or for any markers without a method specified, normalization will use
+#' the default method, currently "zScore". Acceptable non-NULL values include a
+#' data frame with columns columns "commonMarkerName" and "normalizationMethod",
+#' a named vector with elements specifying normalization method and names
+#' referring to each marker in \code{experiment$mergedExpr}, or a single
+#' character value specifying the normalization method to be applied to all
+#' markers. Options for normalization are "zScore", "none", and "warpSet". In
+#' addition, "warpSet" can include a maximum peak number specification as a
+#' number immediately following (e.g. "warpSet2") - see documentation of
+#' \code{flowStats::warpSet} for details. Any markers lacking a specification
+#' will be normalized using the default method (currently "zScore").
+#' @param defaultNormalizationMethod (default: "zScore") A character string, the
+#' normalization method to use for markers without another method specified.
+#' Options are the same as in \code{normalizationInfo} above.
+#' @param seed (default: 12345) Numeric, the random number seed for warpSet
+#' normalization, passed to \code{normalizeWarpSetMergedExpr}
+#' @param verbose (default: TRUE) A logical specifying whether to display processing messages
+#' @return An S3 object of class \code{discovrExperiment}, with additional
+#' elements named "mergedExprNormalizedScaled" and
+#' "clusterMeansNormalizedScaled". If the normalization methods were not taken
+#' from \code{experiment$markerInfo$normalizationMethod}, the normalization
+#' method for each marker will be stored there.
+#'
+#' @seealso \code{\link{discovrExperiment}}
+#' @author Matt Dufort
+#' @import flowCore
+#' @import dplyr
+#' @importFrom stats setNames na.omit
+#' @export
+normalizeDiscovrExperiment <- function(
+    experiment,
+    normalizationInfo = NULL,
+    defaultNormalizationMethod = "zScore",
+    seed = 12345,
+    verbose = TRUE
+){
+  if(!is.discovrExperiment(experiment)){
+    stop(
+      "The object passed to 'normalizeDiscovrExperiment' is not a valid DISCOV-R experiment object. ",
+      "Please create your experiment using the 'setupDiscovrExperiment' function ",
+      "and perform the initial clustering using the 'clusterDiscovrExperiment' function. "
+    )
+  }
+  if(experiment$status %in% c("normalized", "metaclustered")){
+    message(
+      "The experiment has a status of ", experiment$status, ", which indicates that normalization has already been run.\n",
+      "Any existing normalized expression values stored in this experiment object will be overwritten.")
+  } else if(experiment$status != "clustered"){
+    stop(
+      "The experiment must have status 'clustered', 'normalized', or 'metaclustered' in order to be ready for normalization. ",
+      "The current experiment has a status of ", experiment$status, ". ",
+      "Please make sure to create your experiment using the 'setupDiscovrExperiment' function ",
+      "and perform the initial clustering using the 'clusterDiscovrExperiment' function. "
+    )
+  }
+  
+  # check experiment$mergedExpr for validity (shouldn't be necessary, but including to head off some edge cases)
+  if(!is.data.frame(experiment$mergedExpr))
+    stop("'mergedExpr' element within the experiment object is not a data.frame; please check inputs to 'normalizeScaleMergedExpr'")
+  if(!("samp" %in% colnames(experiment$mergedExpr))) {
+    stop(
+      paste("Normalization of marker expression cannot be performed if 'mergedExpr' element",
+            "within the experiment object does not contain column 'samp' specifying sample identity for each event"))
+  }
+  # potential change: add a check on marker names in mergedExpr and normalizationInfo
+  
+  # check defaultNormalizationMethod against accepted values
+  if(
+    !((defaultNormalizationMethod %in% c("zScore", "none", "warpSet")) |
+      str_detect(defaultNormalizationMethod, "^warpSet[0-9]+$")))
+    stop("Value for 'defaultNormalizationMethod' must be 'zScore', 'none', or 'warpset[#]'.")
+  
+  # check normalizationInfo, and set to defaultNormalizationMethod for any markers missing info
+  # output of this chunk should be a data frame with "commonMarkerName" and "normalizationMethod" columns
+  # "commonMarkerName" values should match all marker columns in mergedExpr (which should be all those before "samp")
+  # "normalizationMethod" values should include only the options I've specified
+  if (is.null(normalizationInfo)){
+    # use experiment$markerInfo if it includes normalizationMethod
+    if (!is.null(experiment$markerInfo$normalizationMethod)) {
+      if(verbose){
+        message(
+          paste0(
+            "Found column 'normalizationMethod' in markerInfo;\n",
+            "using specified normalization method for each marker, ",
+            "and ", defaultNormalizationMethod, " for any not specified.\n"))}
+      normalizationInfo <- experiment$markerInfo
+    } else {
+      normalizationInfo <- defaultNormalizationMethod
+    }
+  }
+  if (is.vector(normalizationInfo)) {
+    if ((length(normalizationInfo) == 1)) {
+      normalizationInfo <-
+        setNames(rep(normalizationInfo, times = length(experiment$markerInfo$commonMarkerName)),
+                 experiment$markerInfo$commonMarkerName)
+    }
+    # add zScore for any markers missing from normalizationInfo vector
+    normalizationInfo <-
+      c(normalizationInfo,
+        setNames(
+          rep(defaultNormalizationMethod,
+              times = length(setdiff(experiment$markerInfo$commonMarkerName, names(normalizationInfo)))),
+          setdiff(experiment$markerInfo$commonMarkerName, names(normalizationInfo)))
+      )
+    normalizationInfo <- data.frame(
+      commonMarkerName = names(normalizationInfo),
+      normalizationMethod = unname(normalizationInfo))
+  }
+  if (!is.data.frame(normalizationInfo))
+    stop("Format of 'normalizationInfo' not recognized. It should be a data.frame or character vector.")
+  
+  # fill gaps in normalizationInfo with defaultNormalizationMethod
+  markersMissing <- setdiff(experiment$markerInfo$commonMarkerName, normalizationInfo$commonMarkerName)
+  if (length(markersMissing > 0))
+    normalizationInfo <-
+    bind_rows(normalizationInfo,
+              data.frame(commonMarkerName = markersMissing,
+                         normalizationMethod = defaultNormalizationMethod))
+  if (is.null(normalizationInfo$normalizationMethod)){
+    normalizationInfo$normalizationMethod <- defaultNormalizationMethod
+  }
+  normalizationInfo$normalizationMethod[is.na(normalizationInfo$normalizationMethod)] <- defaultNormalizationMethod
+  
+  # check values in normalizationInfo now that it's assembled
+  normalizationInfo <- checkMarkerInfoNormalizationMethod(normalizationInfo)
+  
+  markersToNormalize <- intersect(normalizationInfo$commonMarkerName, colnames(experiment$mergedExpr))
+  
+  # check mergedExpr and normalizationInfo
+  if (any(!(setdiff(colnames(experiment$mergedExpr), c("samp", "cellSubset", "RPclust")) %in% normalizationInfo$commonMarkerName)))
+    stop("All markers names in 'mergedExpr' must have normalization specified in 'normalizationInfo'")
+  if (!all(sapply(experiment$mergedExpr[, markersToNormalize], is.numeric)))
+    stop("Only numeric values are allow in 'mergedExpr' marker expression levels.")
+  
+  mergedExprNormalizedScaled <- experiment$mergedExpr
+  
+  # apply z-score normalization to each sample, for all markers with z-score normalization specified
+  for (samp.tmp in unique(experiment$mergedExpr$samp)) {
+    mergedExprNormalizedScaled[
+      mergedExprNormalizedScaled$samp == samp.tmp,
+      match(
+        normalizationInfo$commonMarkerName[
+          (normalizationInfo$commonMarkerName %in% markersToNormalize) &
+          (normalizationInfo$normalizationMethod %in% "zScore")],
+            colnames(mergedExprNormalizedScaled))] <-
+      scale(
+        mergedExprNormalizedScaled[
+          mergedExprNormalizedScaled$samp == samp.tmp,
+          match(
+            normalizationInfo$commonMarkerName[
+              (normalizationInfo$commonMarkerName %in% markersToNormalize) &
+                (normalizationInfo$normalizationMethod %in% "zScore")],
+            colnames(mergedExprNormalizedScaled))])
+  }
+  
+  # apply warpSet normalization to each marker, iterating over variations with different numbers of peaks specified
+  if(any(str_detect(normalizationInfo$normalizationMethod[normalizationInfo$commonMarkerName %in% markersToNormalize], "warpSet"))){
+    if(verbose)
+      message("Starting warpSet normalization on select markers")
+    
+    for(warpSetMethod in 
+        unique(grep("^warpSet[0-9]*$",
+                    normalizationInfo$normalizationMethod[normalizationInfo$commonMarkerName %in% markersToNormalize],
+                    value = TRUE))){
+      maxPeakNr <-
+        if(str_detect(warpSetMethod, "(?<=warpSet)[0-9]+")){
+          as.numeric(str_extract(warpSetMethod, "(?<=warpSet)[0-9]+"))
+        } else NULL
+      mergedExprNormalizedScaled[
+        ,
+        c(
+          normalizationInfo$commonMarkerName[
+            (normalizationInfo$commonMarkerName %in% markersToNormalize) &
+              (normalizationInfo$normalizationMethod == warpSetMethod)], "samp")] <-
+        normalizeWarpSetMergedExpr(
+          mergedExprNormalizedScaled[
+            ,
+            c(
+              normalizationInfo$commonMarkerName[
+                (normalizationInfo$commonMarkerName %in% markersToNormalize) &
+                  (normalizationInfo$normalizationMethod == warpSetMethod)], "samp")],
+          peakNr = maxPeakNr, groupCol = "samp", seed = seed)
+    }
+  }
+  
+  # for normalizationMethod "none": no change applied
+  
+  # scale each marker to have comparable weight in metaclustering
+  mergedExprNormalizedScaled[, markersToNormalize] <-
+    scale(mergedExprNormalizedScaled[, markersToNormalize])
+  
+  # skip calculation of marker means by cluster if experiment not clustered yet (only really used when running UMAP prior to clustering)
+  if("RPclust" %in% colnames(mergedExprNormalizedScaled)){
+    # Calculate mean expression value (scaled and normalized) of each marker for each phenograph cluster in each subject
+    clusterMeansNormalizedScaled <- mergedExprNormalizedScaled %>%
+      dplyr::select(-cellSubset) %>%
+      distinct() %>% # remove duplicated rows; mergedExprNormalizedScaled has both parent and gated
+      dplyr::group_by(samp, RPclust) %>%
+      dplyr::summarise_all(mean) %>%
+      dplyr::mutate(RPclust = as.character(RPclust))
+    
+    # Calculate total mean expression (scaled and normalized) for each subject
+    parentMeansNormalizedScaled <- mergedExprNormalizedScaled %>%
+      dplyr::select(-cellSubset, -RPclust) %>%
+      distinct() %>% # remove duplicated rows; mergedExprNormalizedScaled has both parent and gated
+      dplyr::group_by(samp) %>%
+      dplyr::summarise_all(mean) %>%
+      dplyr::mutate(RPclust = "Total_Parent")
+  }
+    
+  # update experiment data
+  experiment$status                          <- "normalized"
+  experiment$markersNormalized               <- markersToNormalize
+  experiment$mergedExprNormalizedScaled      <- mergedExprNormalizedScaled
+  if("RPclust" %in% colnames(mergedExprNormalizedScaled)){
+    experiment$clusterMeansNormalizedScaled    <- bind_rows(clusterMeansNormalizedScaled, parentMeansNormalizedScaled)
+  }
+  experiment$markerInfo$normalizationMethod[experiment$markerInfo$commonMarkerName %in% markersToNormalize] <-
+    normalizationInfo$normalizationMethod[
+      match(experiment$markerInfo$commonMarkerName[experiment$markerInfo$commonMarkerName %in% markersToNormalize],
+            normalizationInfo$commonMarkerName)]
+  experiment$markerInfo$normalizationMethod[!(experiment$markerInfo$commonMarkerName %in% markersToNormalize)] <-
+    "not normalized"
+  
   return(experiment)
 }

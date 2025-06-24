@@ -19,11 +19,18 @@ setupDiscovrExperiment(
 )
 }
 \arguments{
-\item{markerInfoFile}{A character string indicating the path to a .csv file. This file is expected to have columns
-named useToCluster", as well as the names specified in the \code{markerCommonField} and \code{markerFcsField} variables.
-Details of the \code{markerCommonField} and \code{markerFcsField} arguments are provided below; the "useToCluster"
-column should have only TRUE or FALSE values. Markers with a TRUE value in this column will be used for clustering,
-whereas the others will not.}
+\item{markerInfoFile}{A character string indicating the path to a .csv file.
+This file is expected to have columns named useToCluster", as well as the
+names specified in the \code{markerCommonField} and \code{markerFcsField}
+variables. Details of the \code{markerCommonField} and \code{markerFcsField}
+arguments are provided below; the "useToCluster" column should have only TRUE
+or FALSE values. Markers with a TRUE value in this column will be used for
+clustering, whereas the others will not. An optional
+\code{normalizationMethod} can be included to specify the type of
+normalization to be used for each marker; options are "zScore", "none", and
+"warpSet". In addition, "warpSet" can include a peak number specification as
+a number immediately following (e.g. "warpSet2"). Normalization defaults to
+"zScore" for each and all markers if not specified.}
 
 \item{fcsInfoFile}{A character string indicating the path to a file containing columns named "subject",
 "cellSubset", and "filename". The "filename" field must contain paths to the .fcs files that will be used in analysis.}

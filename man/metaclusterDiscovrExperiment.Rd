@@ -51,4 +51,6 @@ Perform metaclustering for a DISCOV-R experiment
 }
 \author{
 Mario G Rosasco, Virginia Muir
+
+Matthew J Dufort, \email{mdufort@benaroyaresearch.org}
 }

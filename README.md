@@ -2,7 +2,7 @@
 
 Functions implementing and supporting the "Distribution analysis across clusters of a parent population overlaid with a rare subpopulation" (DISCOV-R) analysis method (Wiedeman, Muir, et al. 2020).
 
-**NB** - This code has been tested with R version 4.0.1 and 4.0.2. The change from R version 3.x to 4.x came with a number of substantial differences, and so while there's a possibility this package may work with earlier versions of R, it should be considered untested.
+**NB** - This code has been tested with R version 4.4.1. The change from R version 3.x to 4.x came with a number of substantial differences, and so while there's a possibility this package may work with earlier versions of R, it should be considered untested.
 
 ---
 
@@ -26,19 +26,20 @@ Before running DISCOV-R, you'll need to prepare a marker information file and an
 
 #### marker information file
 
-This file should contain 3 columns:
+This file should contain 3 columns (plus 1 optional column):
 
 * A column for the common name of your marker (eg: "CD45RA") - by default this column is expected to be named 'fixed'
 * A column for the marker name as it's represented in the .fcs data (eg: "143Nd_CD45RA") - by default this column is expected to be named 'desc'
-* A column named 'useToCluster' that indicates whether the marker will be used for clustering. This column can only contain the values "TRUE"" or "FALSE".
+* A column named 'useToCluster' that indicates whether the marker will be used for clustering. This column can only contain the values "TRUE" or "FALSE".
+* An optional column named 'normalizationMethod', containing the normalization to be applied to each marker prior to metaclustering. Acceptable values include "zScore", "none", "warpSet", and "warpSet#" where # is a value specifying the number of peaks for warpSet normalization. Any markers with NAs or empty cells will have the default normalization method applied, as will all markers if this column is missing. For more details please see `normalizeDiscovrExperiment` function documentation.
 
 Example "markerInformation.csv": 
 
-| fixed | desc | useToCluster |
-| ----- | ---- | ------------ |
-| CD45	| 89Y_CD45 | TRUE |
-| GRZMA	| 141Pr_GRZMA	| FALSE |
-| ...   | ...  | ... |
+| fixed | desc | useToCluster | normalizationMethod |
+| ----- | ---- | ------------ | ------------------- |
+| CD45	| 89Y_CD45 | TRUE | zScore |
+| GRZMA	| 141Pr_GRZMA	| FALSE | NA |
+| ... | ... | ... | ... |
 
 #### .fcs information file
 
@@ -140,11 +141,36 @@ getSubjectClusters(myExpt)
 # 1 SubjXpb997364476        26
 ```
 
+### Normalizing marker expression
+
+Normalization of marker expression is handled through the function `normalizeDiscovrExperiment()`. Prior to metaclustering, marker expression must be normalized across samples; mean normalized values for each sample-specific cluster are then used to form metacluster. The preferred normalization approach for each marker can be specified by including column 'normalizationMethod' in the markerInfo file, or by passing a value for the argument 'normalizationInfo' to `normalizeDiscovrExperiment()`. 
+
+Different normalization approaches can be evaluated for a subset of markers using the function `testNormalizationMethodByMarker()`.
+
+The effect of normalization, including variations on normalization tested as described above, can be checked using the function `plotDensityNormalizedExprsDiscovrExperiment()`, which outputs a plot of the pre- and post-normalization marker level distributions for each marker in each sample. It is recommended to check these distributions and modify the normalization method as needed so that distributions align well across samples - otherwise metaclusters may be identified that correspond to different cell populations in different sample.
+
+Note that as with the setup and clustering functions, `normalizeDiscovrExperiment` will return a new `discovrExperiment` object that needs to be assigned to a variable.
+
+NOTE: this is a major change in briDiscovr version 0.4. In prior versions, all markers were normalized to z-scores within each sample, and this was handled internally by `metaclusterDiscovrExperiment()`. To allow backward compatibility of code, normalization currently defaults to z-scores if not specified, and normalization will automatically be run (with a warning) if a `discovrExperiment` object is passed to `metaclusterDiscovrExperiment()` prior to normalizing.
+
+```R
+myExpt <- normalizeDiscovrExperiment(myExpt)
+
+print(myExpt)
+## Prints:
+# An object of class 'discovrExperiment'
+# All markers: CD45, GRZMA, CD57, CD45RA, CD38, CD8, CD4, KLRG1, CD14, CD127, CD226, HELIOS, CD2, NKG2C, CD3, TIGIT, CD25, CD27, CD161, TBET, CD39, EOMES, CXCR3, CD95, CD19, NKG2A, CCR7, CD122, CD103, KI67, PD1, CD56, CD16
+# Clustering markers: CD45, GRZMA, CD57, CD45RA, CD38, CD8, CD4, KLRG1, CD14, CD127, CD226, HELIOS, CD2, NKG2C, CD3, TIGIT, CD25, CD27, CD161, TBET, CD39, EOMES, CXCR3, CD95, CD19, NKG2A, CCR7, CD122, CD103, KI67, PD1, CD56, CD16
+# Experiment status: normalized
+
+plotDensityNormalizedExprsDiscovrExperiment(myExpt, filenameOut = "plot.pdf")
+```
+
 ### Metaclustering
 
-Metaclustering is handled throught the function `metaclusterDiscovrExperiment()`. The documentation at `?metaclusterDiscovrExperiment` contains information about how to change cluster occupancy thresholds, target numbers of metaclusters, metaclustering distance and linkage metrics, and how to exclude markers or samples from the metacluster analysis. Note that dropping markers or samples will *not* affect the clustered results, and to exclude samples altogether from the clustering a new experiment should be started from the initialization step. 
+Metaclustering is handled through the function `metaclusterDiscovrExperiment()`. The documentation at `?metaclusterDiscovrExperiment` contains information about how to change cluster occupancy thresholds, target numbers of metaclusters, metaclustering distance and linkage metrics, and how to exclude markers or samples from the metacluster analysis. Note that dropping markers or samples will *not* affect the clustered results, and to exclude samples altogether from the clustering a new experiment should be started from the initialization step. 
 
-Note that as with the clustering function, `metaclusterDiscovrExperiment` will return a new `discovrExperiment` object that needs to be assigned to a variable.
+Note that as with the setup, clustering, and normalization functions, `metaclusterDiscovrExperiment` will return a new `discovrExperiment` object that needs to be assigned to a variable.
 
 ```R
 myExpt <- metaclusterDiscovrExperiment(myExpt)
@@ -249,11 +275,12 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
     
 BiocManager::install("flowCore")
+BiocManager::install("flowStats")
 BiocManager::install("ComplexHeatmap")
 ```
 
-The remaining depndencies should be automatically installed via CRAN, but if you encounter any issues you can manually install using the following code:
+The remaining dependencies should be automatically installed via CRAN, but if you encounter any issues you can manually install using the following code:
 
 ```R
-install.packages(pkgs=c("rlang", "igraph", "RANN", "Rcpp", "methods", "tidyverse", "reshape2", "RColorBrewer", "circlize", "viridisLite")
+install.packages(pkgs=c("rlang", "igraph", "RANN", "Rcpp", "methods", "tidyverse", "reshape2", "RColorBrewer", "circlize", "viridisLite", "grid", "memuse", "umap")
 ```

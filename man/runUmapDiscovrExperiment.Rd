@@ -10,17 +10,20 @@ runUmapDiscovrExperiment(
   downsampleBy = "frequency",
   downsampleFreq = c(parentPopulation = 100, childPopulations = 1),
   downsampleNumber = c(parentPopulation = 100, childPopulations = Inf),
+  normalizationInfo = NULL,
   seed = NULL,
   returnUmapObject = FALSE,
-  returnExpressionZScores = FALSE,
+  returnExpressionNormalizedScaled = FALSE,
   ...
 )
 }
 \arguments{
 \item{experiment}{A discovrExperiment created using
-\code{setupDiscovrExperiment}, \code{clusterDiscovrExperiment}, or
-\code{metaclusterDiscovrExperiment}. In order to return metacluster numbers
-for each cell, its status must be "metaclustered".}
+\code{setupDiscovrExperiment}, \code{clusterDiscovrExperiment},
+\code{normalizeDiscovrExperiment}, or \code{metaclusterDiscovrExperiment}.
+In order to return metacluster numbers for each cell, its status must be
+"metaclustered". If normalization has not already been run, it will be run
+using \code{normalizeDiscovrExperiment} prior to running UMAP.}
 
 \item{umapMarkers}{A character vector, the markers to be used for UMAP. For
 the default value, NULL, the function extracts the set of markers from the
@@ -72,6 +75,14 @@ population to 100 cells. Note that downsampling is based on the order of the
 cells in discovrExperiment, so changes that alter the order of cells will
 make the downsampling results non-reproducible.}
 
+\item{normalizationInfo}{(default: NULL) character string or vector
+specifying normalization method to be applied, passed to
+\code{normalizeDiscovrExperiment}. NOTE: if this argument is non-null,
+the specified normalization will be applied to the input 'experiment', even
+if that object has already had normalization applied. Thus, including a
+non-null value here will override any existing normalization prior to
+running UMAP.}
+
 \item{seed}{(default: NULL) numeric, the seed to be passed to 
 \code{set.seed} to make the UMAP (more) reproducible. If NULL, no seed is set.}
 
@@ -79,10 +90,10 @@ make the downsampling results non-reproducible.}
 UMAP output object and the data frame of cell information as a list. If
 FALSE, returns only the data frame of cell information.}
 
-\item{returnExpressionZScores}{(default: FALSE) logical, if TRUE, includes the
-z-scored expression values for the markers used in the UMAP in the output
-data frame. If FALSE, the data frame only contains the UMAP coordinates and
-cell information.}
+\item{returnExpressionNormalizedScaled}{(default: FALSE) logical, if TRUE,
+includes the normalized, scaled expression values for the markers used in the
+UMAP in the output data frame. If FALSE, the data frame only contains the
+UMAP coordinates and cell information.}
 
 \item{...}{optional arguments passed to \code{umap::umap}.}
 }
@@ -93,16 +104,16 @@ The data frame also contains the metacluster information, if available.
 If \code{returnUmapObject} is TRUE, returns a list with the data frame of
 cell information as element 'data' and the UMAP output object as element
 'umapObject'.
-If \code{returnExpressionZScores} is TRUE, the data frame also contains the
-z-scored expression values for the markers used in the UMAP.
+If \code{returnExpressionNormalizedScaled} is TRUE, the data frame also
+contains the z-scored expression values for the markers used in the UMAP.
 }
 \description{
-This function generates a UMAP from the cells in a
-discovrExperiment object. To do this, it extracts the marker scores for each
-cells, z-scores the expression values within each sample (similar to the
-briDiscovr metaclustering process), optionally downsamples the cells to
-speed the process (with downsampling frequency tunable at the cell population
-level), and then runs the UMAP algorithm. The UMAP algorithm is run using the
+This function generates a UMAP from the cells in a discovrExperiment object.
+To do this, it extracts the marker scores for each cells, z-scores the
+expression values within each sample (similar to the briDiscovr
+metaclustering process), optionally downsamples the cells to speed the
+process (with downsampling frequency tunable at the cell population level),
+and then runs the UMAP algorithm. The UMAP algorithm is run using the
 \code{umap} package, which is a wrapper for the \code{uwot} package. Results
 can be made reproducible by passing a non-NULL value for \code{seed}. This
 function returns a data frame with the UMAP coordinates for each cell, as

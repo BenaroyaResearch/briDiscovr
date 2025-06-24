@@ -1,4 +1,4 @@
-## Copyright (C) 2022  Matt Dufort, Mario Rosasco, Virginia Muir, and Benaroya Research Institute
+## Copyright (C) 2025  Matt Dufort, Mario Rosasco, Virginia Muir, and Benaroya Research Institute
 ##
 ## This file is part of the briDiscovr package
 
@@ -695,15 +695,91 @@ downsampleFcsList <- function(
   return()
 }
 
+#' Test a range of normalization options on a marker in a discovrExperiment
+#' 
+#' This function tests different normalization methods on a marker in a
+#' \code{discovrExperiment} object. Its purpose is to facilitate selection of
+#' the appropriate normalization method for markers where this is not
+#' immediately apparent. It is currently designed to run on one marker at a
+#' time. The results can be examined for appropriate distributions across
+#' samples, or plotted sequentially using
+#' \code{plotDensityNormalizedExprsDiscovrExperiment}
+#' @param experiment A discovrExperiment created using
+#' \code{clusterDiscovrExperiment}, \code{normalizeDiscovrExperiment}, or
+#' \code{metaclusterDiscovrExperiment}. In order to return metacluster numbers
+#' for each cell, its status must be "metaclustered".
+#' @param markers a character vector indicating the markers on which to test
+#' normalization
+#' @param normalizationMethods (default: c("none", "zScore", "warpSet")) a
+#' character vector with the normalization methods to be tested. All values
+#' should be acceptable inputs for the argument 'normalizationMethod' in
+#' \code{normalizeDiscovrExperiment}
+#' @param seed (default: 12345) Numeric, the random number seed for warpSet
+#' normalization, passed to \code{normalizeWarpSetMergedExpr}
+#' @author Matthew J Dufort, \email{mdufort@@benaroyaresearch.org}
+#' @export
+#' @return A reduced \code{discovrExperiment} object (or named list of objects),
+#' each containing only the marker listed, with normalized values in
+#' \code{experiment$mergedExprNormalizedScaled}. If \code{markers} has length >
+#' 1, the function will return a named list, with each element containing a
+#' \code{discovrExperiment} object normalized using the given method.
+testNormalizationMethodByMarker <- function(
+    experiment,
+    markers,
+    normalizationMethods = c("none", "zScore", "warpSet"),
+    seed = 12345
+){
+  # check that the experiment is a discovrExperiment
+  if(!is.discovrExperiment(experiment))
+    stop("The input 'experiment' must be a discovrExperiment object.")
+  
+  # reduce contents of input experiment object to contain only marker(s) of interest
+  if(!is.character(markers)) stop("Input value for 'markers' must be a character vector")
+  if(!all(markers %in% colnames(experiment$mergedExpr))) {
+    stop(
+      paste0("Some markers to normalize were not found in the provided experiment object:\n",
+             paste(setdiff(markers, colnames(experiment$mergedExpr)), collapse=", ")))
+  }
+  experiment$markerInfo <-
+    experiment$markerInfo[experiment$markerInfo$commonMarkerName %in% markers,]
+  experiment$mergedExpr <-
+    experiment$mergedExpr[
+      , colnames(experiment$mergedExpr) %in% c(markers, "samp", "cellSubset", "RPclust", "sampRpClust")]
+  experiment$clusteringMarkers <- markers
+  experiment$markersNormalized <- markers
+  # remove existing normalization information if present
+  experiment$mergedExprNormalizedScaled <- NULL
+  experiment$clusterMeansNormalizedScaled <- NULL
+  
+  if(length(normalizationMethods) == 1) {
+    experimentNormalized <-
+      normalizeDiscovrExperiment(
+        experiment,
+        normalizationInfo = normalizationMethods,
+        seed = seed,
+        verbose = FALSE)
+  } else {
+    experimentNormalized <- list()
+    for(normMethod.tmp in normalizationMethods){
+      experimentNormalized[[normMethod.tmp]] <-
+        normalizeDiscovrExperiment(
+          experiment,
+          normalizationInfo = normMethod.tmp,
+          seed = seed,
+          verbose = FALSE)
+    }
+  }
+  return(experimentNormalized)
+}
 
-#' Calculate UMAP coordinates for the cells from a discovrExperiment object
+#' Calculate UMAP coordinates for the cells from a discovrExperiment object 
 #'
-#' This function generates a UMAP from the cells in a
-#' discovrExperiment object. To do this, it extracts the marker scores for each
-#' cells, z-scores the expression values within each sample (similar to the
-#' briDiscovr metaclustering process), optionally downsamples the cells to
-#' speed the process (with downsampling frequency tunable at the cell population
-#' level), and then runs the UMAP algorithm. The UMAP algorithm is run using the
+#' This function generates a UMAP from the cells in a discovrExperiment object.
+#' To do this, it extracts the marker scores for each cells, z-scores the
+#' expression values within each sample (similar to the briDiscovr
+#' metaclustering process), optionally downsamples the cells to speed the
+#' process (with downsampling frequency tunable at the cell population level),
+#' and then runs the UMAP algorithm. The UMAP algorithm is run using the
 #' \code{umap} package, which is a wrapper for the \code{uwot} package. Results
 #' can be made reproducible by passing a non-NULL value for \code{seed}. This
 #' function returns a data frame with the UMAP coordinates for each cell, as
@@ -711,9 +787,11 @@ downsampleFcsList <- function(
 #' available. The outputs are intended to be visualized using plotting software
 #' such as ggplot2.
 #' @param experiment A discovrExperiment created using
-#' \code{setupDiscovrExperiment}, \code{clusterDiscovrExperiment}, or
-#' \code{metaclusterDiscovrExperiment}. In order to return metacluster numbers
-#' for each cell, its status must be "metaclustered".
+#' \code{setupDiscovrExperiment}, \code{clusterDiscovrExperiment},
+#' \code{normalizeDiscovrExperiment}, or \code{metaclusterDiscovrExperiment}.
+#' In order to return metacluster numbers for each cell, its status must be
+#' "metaclustered". If normalization has not already been run, it will be run
+#' using \code{normalizeDiscovrExperiment} prior to running UMAP.
 #' @param umapMarkers A character vector, the markers to be used for UMAP. For
 #' the default value, NULL, the function extracts the set of markers from the
 #' "clusteringMarkers" element of the discovrExperiment object.
@@ -760,15 +838,22 @@ downsampleFcsList <- function(
 #' population to 100 cells. Note that downsampling is based on the order of the
 #' cells in discovrExperiment, so changes that alter the order of cells will
 #' make the downsampling results non-reproducible.
+#' @param normalizationInfo (default: NULL) character string or vector
+#' specifying normalization method to be applied, passed to
+#' \code{normalizeDiscovrExperiment}. NOTE: if this argument is non-null,
+#' the specified normalization will be applied to the input 'experiment', even
+#' if that object has already had normalization applied. Thus, including a
+#' non-null value here will override any existing normalization prior to
+#' running UMAP.
 #' @param seed (default: NULL) numeric, the seed to be passed to 
 #' \code{set.seed} to make the UMAP (more) reproducible. If NULL, no seed is set.
 #' @param returnUmapObject (default: FALSE) logical, if TRUE, returns the full
 #' UMAP output object and the data frame of cell information as a list. If
 #' FALSE, returns only the data frame of cell information.
-#' @param returnExpressionZScores (default: FALSE) logical, if TRUE, includes the
-#' z-scored expression values for the markers used in the UMAP in the output
-#' data frame. If FALSE, the data frame only contains the UMAP coordinates and
-#' cell information.
+#' @param returnExpressionNormalizedScaled (default: FALSE) logical, if TRUE,
+#' includes the normalized, scaled expression values for the markers used in the
+#' UMAP in the output data frame. If FALSE, the data frame only contains the
+#' UMAP coordinates and cell information.
 #' @param ... optional arguments passed to \code{umap::umap}.
 #' @importFrom umap umap
 #' @import dplyr
@@ -780,33 +865,62 @@ downsampleFcsList <- function(
 #' If \code{returnUmapObject} is TRUE, returns a list with the data frame of
 #' cell information as element 'data' and the UMAP output object as element
 #' 'umapObject'.
-#' If \code{returnExpressionZScores} is TRUE, the data frame also contains the
-#' z-scored expression values for the markers used in the UMAP.
+#' If \code{returnExpressionNormalizedScaled} is TRUE, the data frame also
+#' contains the z-scored expression values for the markers used in the UMAP.
 runUmapDiscovrExperiment <- function(
     experiment,
     umapMarkers = NULL,
     downsampleBy = "frequency",
     downsampleFreq = c("parentPopulation" = 100, "childPopulations" = 1),
     downsampleNumber = c("parentPopulation" = 100, "childPopulations" = Inf),
+    normalizationInfo = NULL,
     seed = NULL,
     returnUmapObject = FALSE,
-    returnExpressionZScores = FALSE,
+    returnExpressionNormalizedScaled = FALSE,
     ...
 ){
   # check that the experiment is a discovrExperiment
   if(!is.discovrExperiment(experiment))
     stop("The input 'experiment' must be a discovrExperiment object.")
   
-  # check that umapMarkers is valid, and set it to the default if NULL
+  # normalize expression values if normalizationInfo is non-null, even if normalization has already been done
+  if(!is.null(normalizationInfo)) {
+    message("Detected normalization specifications in 'normalizationInfo'. Running normalization prior to UMAP.\n")
+    experiment <- normalizeDiscovrExperiment(experiment, normalizationInfo = normalizationInfo, ...)
+    # check that normalized expression values are present, or normalizationInfo is provided
+  } else if(experiment$status %in% c("normalized", "metaclustered")) {
+    if(is.null(experiment$mergedExprNormalizedScaled))
+      stop("The input 'experiment' has status", experiment$status,
+           " but does not include normalized expression values. Please ensure that it is run through 'normalizeDiscovrExperiment'")
+  } else if(experiment$status %in% c("initialized", "clustered")) {
+    if(is.null(experiment$markerInfo$normalizationMethod)) {
+      stop("The input 'experiment' has status ", experiment$status, ".\n",
+           "In order to run this function on a 'clustered' discovrExperiment object,\n",
+           "the input 'experiment' must include normalization specifications in 'markerInfo'\n",
+           "or you must provide a non-null input for 'normalizationInfo' that can be passed to 'normalizedDiscovrExperiment'.")
+    } else {
+      message(
+        "The input 'experiment' has not yet had marker expression normalized using the\n",
+        "'normalizeDiscovrExperiment' function. Normalization will now be performed prior to metaclustering,\n",
+        "using the normalizationMethod specifications provided in 'markerInfo'.\n",
+        "Note that this function does not perform default normalization unless explicitly told to do so\n",
+        "using the argument 'normalizationInfo', in order to avoid unintended results.")
+      
+      experiment$status <- "clustered" # set status to clustered to avoid some hickups with normalizeDiscovrExperiment
+      experiment <- normalizeDiscovrExperiment(experiment)
+    }
+  }
+
+# check that umapMarkers is valid, and set it to the default if NULL
   if(is.null(umapMarkers)) {
     umapMarkers <- experiment$clusteringMarkers
-  } else if(!all(umapMarkers %in% colnames(experiment$mergedExpr))) {
+  } else if(!all(umapMarkers %in% colnames(experiment$mergedExprNormalizedScaled))) {
     stop(
       paste0(
-        "The input 'umapMarkers' specifies markers that are not present in ",
-        "the 'mergedExpr' element of the discovrExperiment object. Please ",
-        "verify the inclusion of the following markers: ",
-        paste(setdiff(umapMarkers, colnames(experiment$mergedExpr)), 
+        "The input 'umapMarkers' specifies markers that are not present in the expression data\n",
+        "('mergedExpr' or 'mergedExprNormalizedScaled') of the discovrExperiment object.\n",
+        "Please verify the inclusion of the following markers: ",
+        paste(setdiff(umapMarkers, colnames(experiment$mergedExprNormalizedScaled)), 
               collapse = ", ")))
   } else if(length(umapMarkers) < 2) {
     stop("The input 'umapMarkers' must contain at least two markers.")
@@ -815,13 +929,13 @@ runUmapDiscovrExperiment <- function(
   # collapse cellSubset field to a character vector (rather than lists)
   if (!any(lengths(experiment$cellSubset) > 1)) {
     # if all contain only a single element, collapse to a character vector
-    experiment$mergedExpr$cellSubset <-
-      sapply(experiment$mergedExpr$cellSubset, `[[`, 1)
+    experiment$mergedExprNormalizedScaled$cellSubset <-
+      sapply(experiment$mergedExprNormalizedScaled$cellSubset, `[[`, 1)
   } else {
     # if any contain multiple elements, use the first non-parent population
-    experiment$mergedExpr$cellSubset <-
+    experiment$mergedExprNormalizedScaled$cellSubset <-
       lapply(
-        experiment$mergedExpr$cellSubset,
+        experiment$mergedExprNormalizedScaled$cellSubset,
         \(x) {
           if (length(x) == 1) x else x[which(x != experiment$parentPopulation)[1]]}) %>%
       unlist()
@@ -845,7 +959,7 @@ runUmapDiscovrExperiment <- function(
         c("parentPopulation" = 1, "childPopulations" = 1)
     } else if(!is.null(names(downsampleFreq))) {
       if (!(setequal(names(downsampleFreq), c("parentPopulation", "childPopulations")) |
-            setequal(names(downsampleFreq), experiment$mergedExpr$cellSubset)))
+            setequal(names(downsampleFreq), experiment$mergedExprNormalizedScaled$cellSubset)))
         stop(
           paste0(
             "If the input 'downsampleFreq' is a named vector, the names must ",
@@ -867,8 +981,10 @@ runUmapDiscovrExperiment <- function(
       # if downsampleFreq is of length > 2, it is used for each population
       if(length(downsampleFreq) != length(unique(names(downsampleFreq))))
         stop("The input 'downsampleFreq' contains duplicate names. Please provide a named vector with unique names.")
-      if(!setequal(names(downsampleFreq), experiment$mergedExpr$cellSubset))
-        stop("The input 'downsampleFreq' does not contain the same names as the cell populations in the 'mergedExpr' element of the discovrExperiment object.")
+      if(!setequal(names(downsampleFreq), experiment$mergedExprNormalizedScaled$cellSubset))
+        stop(
+          "The input 'downsampleFreq' does not contain the same names as the cell populations in the\n",
+          "'mergedExpr' or 'mergedExprNormalizedScaled' elements of the discovrExperiment object.")
     } else stop("The input 'downsampleFreq' is not valid. Please provide NULL or a numeric vector of length > 0.")
     
     # standardize downsampleFreq to be a named vector with the same names as the cell populations
@@ -876,10 +992,10 @@ runUmapDiscovrExperiment <- function(
       downsampleFreq <-
         c(downsampleFreq[["parentPopulation"]],
           rep(downsampleFreq[["childPopulations"]],
-              length(unique(experiment$mergedExpr$cellSubset)) - 1))
+              length(unique(experiment$mergedExprNormalizedScaled$cellSubset)) - 1))
       names(downsampleFreq) <-
         c(experiment$parentPopulation,
-          setdiff(experiment$mergedExpr$cellSubset, experiment$parentPopulation))
+          setdiff(experiment$mergedExprNormalizedScaled$cellSubset, experiment$parentPopulation))
     }
   
     
@@ -897,7 +1013,7 @@ runUmapDiscovrExperiment <- function(
         c("parentPopulation" = Inf, "childPopulations" = Inf)
     } else if(!is.null(names(downsampleNumber))) {
       if (!(setequal(names(downsampleNumber), c("parentPopulation", "childPopulations")) |
-            setequal(names(downsampleNumber), experiment$mergedExpr$cellSubset)))
+            setequal(names(downsampleNumber), experiment$mergedExprNormalizedScaled$cellSubset)))
         stop(
           paste0(
             "If the input 'downsampleNumber' is a named vector, the names must ",
@@ -919,8 +1035,10 @@ runUmapDiscovrExperiment <- function(
       # if downsampleNumber is of length > 2, it is used for each population
       if(length(downsampleNumber) != length(unique(names(downsampleNumber))))
         stop("The input 'downsampleNumber' contains duplicate names. Please provide a named vector with unique names.")
-      if(!setequal(names(downsampleNumber), experiment$mergedExpr$cellSubset))
-        stop("The input 'downsampleNumber' does not contain the same names as the cell populations in the 'mergedExpr' element of the discovrExperiment object.")
+      if(!setequal(names(downsampleNumber), experiment$mergedExprNormalizedScaled$cellSubset))
+        stop(
+          "The input 'downsampleNumber' does not contain the same names as the cell populations in the\n",
+          "'mergedExpr' or 'mergedExprNormalizedScaled' elements of the discovrExperiment object.")
     } else stop("The input 'downsampleNumber' is not valid. Please provide NULL or a numeric vector of length > 0.")
     
     # standardize downsampleNumber to be a named vector with the same names as the cell populations
@@ -928,23 +1046,18 @@ runUmapDiscovrExperiment <- function(
       downsampleNumber <-
         c(downsampleNumber[["parentPopulation"]],
           rep(downsampleNumber[["childPopulations"]],
-              length(unique(experiment$mergedExpr$cellSubset)) - 1))
+              length(unique(experiment$mergedExprNormalizedScaled$cellSubset)) - 1))
       names(downsampleNumber) <-
         c(experiment$parentPopulation,
-          setdiff(experiment$mergedExpr$cellSubset, experiment$parentPopulation))
+          setdiff(experiment$mergedExprNormalizedScaled$cellSubset, experiment$parentPopulation))
     }
   }
   
-  # extract the cell populations and the merged expression matrix, z-score the data
+  # extract the cell populations and the merged, normalized, scaled expression matrix
   # this is run after the initial downsampling steps so that it doesn't run if there's anything wrong with the downsampling inputs
   exprData <-
-    experiment$mergedExpr %>%
-    dplyr::select(samp, cellSubset, any_of("sampRpClust"), all_of(umapMarkers)) %>%
-    group_by(samp) %>% # group by sample
-    mutate(
-      across(.cols = all_of(umapMarkers),
-             .fns = ~ scale(.x, center = TRUE, scale = TRUE)[,1])) %>%
-    ungroup()
+    experiment$mergedExprNormalizedScaled %>%
+    dplyr::select(samp, cellSubset, any_of("sampRpClust"), all_of(umapMarkers))
   
   # downsample the data
   
@@ -1031,8 +1144,8 @@ runUmapDiscovrExperiment <- function(
       select(-sampRpClust)
   }
   
-  # remove expression values from the data frame, unless returnExpressionZScores is TRUE
-  if(!isTRUE(returnExpressionZScores))
+  # remove expression values from the data frame, unless returnExpressionNormalizedScaled is TRUE
+  if(!isTRUE(returnExpressionNormalizedScaled))
     exprData <- exprData %>%
     select(samp, cellSubset, any_of("metacluster"))
   
@@ -1053,4 +1166,137 @@ runUmapDiscovrExperiment <- function(
     # return the data frame with UMAP coordinates
     return(exprData)
   }
+}
+
+#' Plot normalized vs. pre-normalization marker level distributions for a discovrExperiment object
+#'
+#' This function generates a set of density plots of the pre- and
+#' post-normalization expression values from a discovrExperiment object. If
+#' the object has status "normalized" or "metaclustered", the normalized values
+#' will be used. If the object has status "clustered", normalization will be
+#' attempted using information provided, passed to
+#' \code{normalizeDiscovrExperiment}. The function returns a list of plots as
+#' ggplot2 objects, and can optionally output plots to a single file containing
+#' a separate page for each marker. The purpose of this function is to evaluate
+#' potential normalization methods for each marker, based on distributions of
+#' the marker levels before and after normalization.
+#' @param experiment A discovrExperiment created using
+#' \code{clusterDiscovrExperiment}, \code{normalizeDiscovrExperiment},
+#' \code{metaclusterDiscovrExperiment}. Must have status "clustered",
+#' "normalized", or "metaclustered".
+#' @param clusteringMarkersOnly (default: NULL)
+#' @param normalizationInfo (default: NULL) Optional object containing
+#' information on how to normalize, passed to \code{normalizeDiscovrExperiment}
+#' (see documentation of that function for usage details). If this argument
+#' is non-null, normalization will be performed prior to plotting, even if the
+#' 'experiment' object has already been normalized. This allows for testing a
+#' range of normalization approaches on a discovrExperiment object. A non-null
+#' value must be provided if \code{experiment} has status "clustered" or does
+#' not contain the element \code{mergedExprNormalizedScaled} which is generated
+#' by \code{normalizeDiscovrExperiment}.
+#' @param filenameOut (default: NULL) Path for outputing a file with plots. If
+#' null, no file is generated. The extension is used to determine plot type,
+#' which can be "pdf", "png", or "svg".
+#' @param width (default: 12) Numeric, width of output plot device in inches
+#' @param height (default: 6) Numeric, height of output plot device in inches
+#' @param ... optional arguments passed to \code{normalizeDiscovrExperiment}
+#' @import ggplot2
+#' @importFrom stringr str_extract str_to_lower
+#' @importFrom rlang sym :=
+#' @importFrom grDevices jpeg pdf svg tiff
+#' @author Matthew J Dufort, \email{mdufort@@benaroyaresearch.org}
+#' @export
+#' @return A list of ggplot objects, one for each marker. Plots will be output
+#' to file if filenameOut is specified. To suppress output to the default
+#' plotting device, assign the result to an object, or run the function with
+#' \code{invisible()}
+plotDensityNormalizedExprsDiscovrExperiment <- function(
+    experiment,
+    clusteringMarkersOnly = TRUE,
+    normalizationInfo = NULL,
+    filenameOut = NULL,
+    width = 12, height = 6,
+    ...
+){
+  # check that the experiment is a discovrExperiment
+  if(!is.discovrExperiment(experiment))
+    stop("The input 'experiment' must be a discovrExperiment object.")
+  
+  # check status of the experiment
+  if(!(experiment$status %in% c("clustered", "normalized", "metaclustered")))
+    stop("The input 'experiment' must have status 'clustered', 'normalized', 'metaclustered' in order to use this function. ",
+         "The provided 'experiment' object has status ", experiment$status)
+  
+  # # normalize expression values if normalizationInfo is non-null
+  # if(!is.null(normalizationInfo)) {
+  #   experiment <- normalizeDiscovrExperiment(experiment, normalizationInfo = normalizationInfo, ...)
+  # # check that normalized expression values are present, or normalizationInfo is provided
+  # } else if(experiment$status %in% c("normalized", "metaclustered")) {
+  #   if(is.null(experiment$mergedExprNormalizedScaled))
+  #     stop("The input 'experiment' has status", experiment$status, " but does not include normalized expression values.\n",
+  #          "Please ensure that it is run through 'normalizeDiscovrExperiment'")
+  # } else if(experiment$status == "clustered") {
+  #   stop("The input 'experiment' has status 'clustered'. In order to run this function on a 'clustered' discovrExperiment object, ",
+  #        "you must provide a non-null input for 'normalizationInfo' that can be passed to 'normalizedDiscovrExperiment'.")
+  # }
+  
+  # determine markers to plot
+  if(isTRUE(clusteringMarkersOnly)) {
+    markersToPlot <- experiment$clusteringMarkers
+  } else {
+    markersToPlot <-
+      setdiff(
+        intersect(colnames(experiment$mergedExpr), colnames(experiment$mergedExprNormalizedScaled)),
+        c("samp", "cellSubset", "RPclust"))
+  }
+  
+  # generate plots
+  plotList <- list()
+  for (marker.tmp in markersToPlot) {
+    plotList[[marker.tmp]] <-
+      ggplot(
+        bind_rows(
+          experiment$mergedExpr %>%
+            dplyr::select(samp, markerExpr := !!rlang::sym(marker.tmp)) %>%
+            mutate(normStatus = "arcsinh-transformed"),
+          experiment$mergedExprNormalizedScaled %>%
+            dplyr::select(samp, markerExpr := !!rlang::sym(marker.tmp)) %>%
+            mutate(normStatus = "normalized")),
+        mapping = aes(x = markerExpr, group = samp)) +
+      geom_density() +
+      facet_wrap(~normStatus, scales = "free") +
+      labs(
+        x = "marker level", y = "density",
+        title = 
+          paste0(
+            marker.tmp,
+            " (normalization: ",
+            experiment$markerInfo$normalizationMethod[match(marker.tmp, experiment$markerInfo$commonMarkerName)],
+            ")"))
+  }
+  
+
+  # output plots if specified to do so
+  if(!is.null(filenameOut)) {
+    # check extension and open plotting device
+    extensionOut <- str_extract(str_to_lower(filenameOut), "(?<=\\.)(pdf|png|jpeg|tiff|svg)(?=$)")
+    if(is.na(extensionOut)) stop("Filename specified for output must have extension 'pdf', 'png', 'jpeg', 'tiff', or 'svg'")
+        if(extensionOut == "pdf") {
+      pdf(file = filenameOut, width = width, height = height)
+    } else if(extensionOut == "png") {
+      png(filename = filenameOut, width = width, height = height, units = "inches")
+    } else if(extensionOut == "jpeg") {
+      jpeg(filename = filenameOut, width = width, height = height, units = "inches")
+    } else if(extensionOut == "tiff") {
+      tiff(filename = filenameOut, width = width, height = height, units = "inches")
+    } else if(extensionOut == "svg") {
+      svg(filename = filenameOut, width = width, height = height)
+    }
+    
+    for (plot.tmp in plotList) print(plot.tmp)
+    
+    invisible(dev.off())
+  }
+  
+  return(plotList)
 }
