@@ -100,40 +100,88 @@ checkMarkerInfoNormalizationMethod <- function(markerInfo){
 #' @importFrom flowStats warpSet
 #' @importFrom rlang sym
 normalizeWarpSetMergedExpr <- function(mergedExpr, peakNr = NULL, groupCol = "samp", seed = 12345){
+  # check inputs
+  if(!is.data.frame(mergedExpr)) stop("Input 'mergedExpr' must be a data.frame")
   if (!all(sapply(mergedExpr[, !(colnames(mergedExpr) %in% groupCol)], is.numeric)))
     stop("Cannot perform warpSet normalization on non-numeric columns")
+  
+  # store information for later checking
+  colnamesMergedExpr <- colnames(mergedExpr)
+  groupColValuesMergedExpr <- mergedExpr[[groupCol]]
   
   # add a rowIdx to mergedExpr for easier merging later
   mergedExpr$rowIdx <- seq_len(nrow((mergedExpr)))
   
-  # split mergedExpr by groupCol
-  normMergedExpr <- group_split(mergedExpr, !!rlang::sym(groupCol), .keep = TRUE)
+  # identify markers to normalize
+  markersToNormalize <- setdiff(colnames(mergedExpr), c(groupCol, "rowIdx"))
   
-  # create flowSet
-  flowSetMergedExpr <-
-    flowSet(lapply(normMergedExpr, \(currFlowDat) flowFrame(as.matrix(currFlowDat[, !(colnames(currFlowDat) %in% c(groupCol, "rowIdx"))]))))
+  # normalize markers one at a time, and replace values in mergedExpr with these normalized values
+  for(marker.tmp in markersToNormalize){
+    normMergedExprByMarker <-
+      normalizeWarpSetSingleMarker(
+        mergedExpr[,c(marker.tmp, groupCol, "rowIdx")],
+        marker = marker.tmp,
+        peakNr = peakNr, groupCol = groupCol, seed = seed)
+    mergedExpr[, marker.tmp] <-
+      normMergedExprByMarker[
+        match(mergedExpr$rowIdx, normMergedExprByMarker$rowIdx), marker.tmp]
+  }
   
+  # sort normalized data, check it, and remove rowIdx
+  mergedExpr <- dplyr::arrange(mergedExpr, rowIdx)
+  mergedExpr[["rowIdx"]] <- NULL
+  if(!(identical(colnames(mergedExpr), colnamesMergedExpr) &
+       identical(mergedExpr[[groupCol]], groupColValuesMergedExpr)))
+    stop("Something went wrong with warpSet normalization")
+  
+  return(mergedExpr)
+}
+
+# Private function to apply warpSet normalization to a single marker
+# this is done marker-by-marker to make the normalization more reproducible
+# this function starts with a matrix containing sample information and one marker's expression
+# it converts to flowSet splitting on a variable (generally "samp")
+# should include only the marker to be normalized, the grouping column as groupCol, and rowIdx
+# if peakNr (peak number) is specified for the current set of markers, it can be passed as peakNr
+#' @importFrom flowStats warpSet
+#' @importFrom rlang sym
+normalizeWarpSetSingleMarker <-
+  function(mergedExprByMarker, marker, peakNr = NULL, groupCol = "samp", seed = 12345){
+    # check inputs
+    if(!is.data.frame(mergedExprByMarker)) stop("Input 'mergedExpr' must be a data.frame")
+    if(!setequal(colnames(mergedExprByMarker), c(marker, groupCol, "rowIdx")))
+      stop("Input 'mergedExprByMarker' should contain only the marker, grouping column, and row index")
+    
+    # split mergedExpr by groupCol
+    normMergedExprByMarker <- group_split(mergedExprByMarker, !!rlang::sym(groupCol), .keep = TRUE)
+    
+    # create flowSet
+    flowSetMergedExprByMarker <-
+      flowSet(
+        lapply(normMergedExprByMarker,
+               \(currFlowDat) flowFrame(as.matrix(currFlowDat[, !(colnames(currFlowDat) %in% c(groupCol, "rowIdx"))]))))
+    
   # set random number seed before running warpSet, to ensure consistent results
   set.seed(seed)
   
   # run warpSet normalization
-  flowSetMergedExpr <-
-    warpSet(flowSetMergedExpr, stains = setdiff(colnames(mergedExpr), c(groupCol, "rowIdx")), peakNr = peakNr)
+  flowSetMergedExprByMarker <-
+    warpSet(flowSetMergedExprByMarker,
+            stains = marker, peakNr = peakNr)
   
   # extract normalized expression from the flowSet object
-  for(i in seq_len(length(normMergedExpr))){
-    normMergedExpr[[i]][, match(colnames(exprs(flowSetMergedExpr[[i]])), colnames(normMergedExpr[[i]]))] <-
-      exprs(flowSetMergedExpr[[i]])
+  for(i in seq_len(length(normMergedExprByMarker))){
+    normMergedExprByMarker[[i]][, marker] <-
+      exprs(flowSetMergedExprByMarker[[i]])
   }
   
-  # merge normalized data, check it, and remove rowIdx
-  normMergedExpr <-
-    bind_rows(normMergedExpr) %>%
+  # merge normalized data, check it
+  normMergedExprByMarker <-
+    bind_rows(normMergedExprByMarker) %>%
     dplyr::arrange(rowIdx)
-  if(!(identical(colnames(mergedExpr), colnames(normMergedExpr)) &
-       identical(mergedExpr[[groupCol]], normMergedExpr[[groupCol]])))
+  if(!(identical(colnames(mergedExprByMarker), colnames(normMergedExprByMarker)) &
+       identical(mergedExprByMarker[[groupCol]], normMergedExprByMarker[[groupCol]])))
     stop("Something went wrong with warpSet normalization")
-  normMergedExpr[["rowIdx"]] <- NULL
   
-  return(normMergedExpr)
+  return(normMergedExprByMarker)
 }

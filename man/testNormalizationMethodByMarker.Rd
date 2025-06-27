@@ -7,7 +7,7 @@
 testNormalizationMethodByMarker(
   experiment,
   markers,
-  normalizationMethods = c("none", "zScore", "warpSet"),
+  normalizationMethod = c("none", "zScore", "warpSet"),
   seed = 12345
 )
 }
@@ -20,13 +20,17 @@ for each cell, its status must be "metaclustered".}
 \item{markers}{a character vector indicating the markers on which to test
 normalization}
 
-\item{normalizationMethods}{(default: c("none", "zScore", "warpSet")) a
+\item{normalizationMethod}{(default: c("none", "zScore", "warpSet")) a
 character vector with the normalization methods to be tested. All values
 should be acceptable inputs for the argument 'normalizationMethod' in
-\code{normalizeDiscovrExperiment}}
+\code{normalizeDiscovrExperiment}. If \code{seed} has length > 1, this
+must be a single character string, either "warpSet" or "warpSet[#]".}
 
-\item{seed}{(default: 12345) Numeric, the random number seed for warpSet
-normalization, passed to \code{normalizeWarpSetMergedExpr}}
+\item{seed}{(default: 12345) Numeric, the random number seed(s) for warpSet
+normalization, passed to \code{normalizeWarpSetMergedExpr}. If testing
+various random number seeds with warpSet normalization, this should be a
+numeric vector of length > 1, and \code{normalizationMethod} should be
+either "warpSet" or "warpSet[#]"}
 }
 \value{
 A reduced \code{discovrExperiment} object (or named list of objects),
@@ -39,9 +43,12 @@ each containing only the marker listed, with normalized values in
 This function tests different normalization methods on a marker in a
 \code{discovrExperiment} object. Its purpose is to facilitate selection of
 the appropriate normalization method for markers where this is not
-immediately apparent. It is currently designed to run on one marker at a
-time. The results can be examined for appropriate distributions across
-samples, or plotted sequentially using
+immediately apparent. It can be run on a set of markers and a set of 
+different normalization methods to be tested on each marker. Alternatively,
+it can be run with a single warpSet normalization method and a set of
+different random number seeds, to evaluate the effect of the random number
+seed on the warpSet normalization results. The results can be examined for
+appropriate distributions across samples, or plotted sequentially using
 \code{plotDensityNormalizedExprsDiscovrExperiment}
 }
 \author{

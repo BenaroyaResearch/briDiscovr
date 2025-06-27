@@ -700,9 +700,12 @@ downsampleFcsList <- function(
 #' This function tests different normalization methods on a marker in a
 #' \code{discovrExperiment} object. Its purpose is to facilitate selection of
 #' the appropriate normalization method for markers where this is not
-#' immediately apparent. It is currently designed to run on one marker at a
-#' time. The results can be examined for appropriate distributions across
-#' samples, or plotted sequentially using
+#' immediately apparent. It can be run on a set of markers and a set of 
+#' different normalization methods to be tested on each marker. Alternatively,
+#' it can be run with a single warpSet normalization method and a set of
+#' different random number seeds, to evaluate the effect of the random number
+#' seed on the warpSet normalization results. The results can be examined for
+#' appropriate distributions across samples, or plotted sequentially using
 #' \code{plotDensityNormalizedExprsDiscovrExperiment}
 #' @param experiment A discovrExperiment created using
 #' \code{clusterDiscovrExperiment}, \code{normalizeDiscovrExperiment}, or
@@ -710,12 +713,16 @@ downsampleFcsList <- function(
 #' for each cell, its status must be "metaclustered".
 #' @param markers a character vector indicating the markers on which to test
 #' normalization
-#' @param normalizationMethods (default: c("none", "zScore", "warpSet")) a
+#' @param normalizationMethod (default: c("none", "zScore", "warpSet")) a
 #' character vector with the normalization methods to be tested. All values
 #' should be acceptable inputs for the argument 'normalizationMethod' in
-#' \code{normalizeDiscovrExperiment}
-#' @param seed (default: 12345) Numeric, the random number seed for warpSet
-#' normalization, passed to \code{normalizeWarpSetMergedExpr}
+#' \code{normalizeDiscovrExperiment}. If \code{seed} has length > 1, this
+#' must be a single character string, either "warpSet" or "warpSet[#]".
+#' @param seed (default: 12345) Numeric, the random number seed(s) for warpSet
+#' normalization, passed to \code{normalizeWarpSetMergedExpr}. If testing
+#' various random number seeds with warpSet normalization, this should be a
+#' numeric vector of length > 1, and \code{normalizationMethod} should be
+#' either "warpSet" or "warpSet[#]"
 #' @author Matthew J Dufort, \email{mdufort@@benaroyaresearch.org}
 #' @export
 #' @return A reduced \code{discovrExperiment} object (or named list of objects),
@@ -726,12 +733,27 @@ downsampleFcsList <- function(
 testNormalizationMethodByMarker <- function(
     experiment,
     markers,
-    normalizationMethods = c("none", "zScore", "warpSet"),
+    normalizationMethod = c("none", "zScore", "warpSet"),
     seed = 12345
 ){
   # check that the experiment is a discovrExperiment
   if(!is.discovrExperiment(experiment))
     stop("The input 'experiment' must be a discovrExperiment object.")
+  
+  # check that either normalizationMethod or seed is of length 1
+  # and if length(seed) > 1, then normalizationMethod must be warpSet or warpSet[#]
+  if(length(seed) > 1){
+    if((length(normalizationMethod) > 1) | !all(str_detect(normalizationMethod, "^warpSet(?=[0-9]*)"))){
+      stop("Multiple random number seeds can only run with a single warpSet normalization method")
+    } else {
+      message(
+        paste0("Detected multiple random number seeds and normalization method ", normalizationMethod, ".\n",
+               "Running ", normalizationMethod, " normalization with each random number seed."))
+      testMode <- "multiSeed"
+    }
+  } else if(length(normalizationMethod) == 1){
+    testMode <- "singleNormMethod"
+  } else testMode <- "multiNormMethods"
   
   # reduce contents of input experiment object to contain only marker(s) of interest
   if(!is.character(markers)) stop("Input value for 'markers' must be a character vector")
@@ -751,21 +773,32 @@ testNormalizationMethodByMarker <- function(
   experiment$mergedExprNormalizedScaled <- NULL
   experiment$clusterMeansNormalizedScaled <- NULL
   
-  if(length(normalizationMethods) == 1) {
+  # run the normalization based on modes determined above
+  if(testMode == "singleNormMethod"){
     experimentNormalized <-
       normalizeDiscovrExperiment(
         experiment,
-        normalizationInfo = normalizationMethods,
+        normalizationInfo = normalizationMethod,
         seed = seed,
         verbose = FALSE)
-  } else {
+  } else if(testMode == "multiNormMethods"){
     experimentNormalized <- list()
-    for(normMethod.tmp in normalizationMethods){
+    for(normMethod.tmp in normalizationMethod){
       experimentNormalized[[normMethod.tmp]] <-
         normalizeDiscovrExperiment(
           experiment,
           normalizationInfo = normMethod.tmp,
           seed = seed,
+          verbose = FALSE)
+    }
+  } else if(testMode == "multiSeed"){
+    experimentNormalized <- list()
+    for(seed.tmp in seed){
+      experimentNormalized[[paste0(normalizationMethod, "_seed", seed.tmp)]] <-
+        normalizeDiscovrExperiment(
+          experiment,
+          normalizationInfo = normalizationMethod,
+          seed = seed.tmp,
           verbose = FALSE)
     }
   }
