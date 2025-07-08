@@ -1,6 +1,6 @@
 # briDiscovr
 
-Functions implementing and supporting the "Distribution analysis across clusters of a parent population overlaid with a rare subpopulation" (DISCOV-R) analysis method (Wiedeman, Muir, et al. 2020).
+Functions implementing and supporting the "Distribution analysis across clusters of a parent population overlaid with a rare subpopulation" (DISCOV-R) analysis method, published in Wiedeman, Muir, et al. 2020, "Autoreactive CD8+ T cell exhaustion distinguishes subjects with slow type 1 diabetes progression", [PMID 31815738](https://pubmed.ncbi.nlm.nih.gov/31815738/).
 
 **NB** - This code has been tested with R version 4.4.1. The change from R version 3.x to 4.x came with a number of substantial differences, and so while there's a possibility this package may work with earlier versions of R, it should be considered untested.
 
