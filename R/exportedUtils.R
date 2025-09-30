@@ -99,7 +99,7 @@ getSubjectCounts <- function(experiment){
   eventsByDonor <-
     experiment$mergedExpr %>%
     rename(sample = .data$samp) %>%
-    group_by(.data$sample) %>%
+    group_by(sample) %>%
     summarise(nEvents = n(), .groups = "drop_last") %>%
     as.data.frame()
 
@@ -138,8 +138,8 @@ getSubjectClusters <- function(experiment){
   # Get summary of the number of clusters generated for each subject
   nPhenoClusts <- experiment$mergedExpr %>%
     rename(sample = .data$samp) %>%
-    group_by(.data$sample) %>%
-    summarize(kClusters = max(.data$RPclust)) %>%
+    group_by(sample) %>%
+    summarize(kClusters = max(RPclust)) %>%
     as.data.frame()
 
   return(nPhenoClusts)
@@ -182,10 +182,10 @@ getMetaclusterOccupancy <- function(experiment, precision=2){
 #' Compute and return individual event intensities from a metaclustered experiment
 #'
 #' @param experiment A metaclustered discovrExperiment
-#' @param cellSubsets A string or vector of strings indicating which cell subsets to return event z-scores from
-#' @param metaclusters An integer or vector of integers indicating which metaclusters to return event z-scores from
-#' @param subjects A string or vector of strings indicating which subjects to return event z-scores from
-#' @param markers A string or vector of strings indicating which markers to return event z-scores from
+#' @param cellSubsets A string or vector of strings indicating which cell subsets to return event intensities from
+#' @param metaclusters An integer or vector of integers indicating which metaclusters to return event intensities from
+#' @param subjects A string or vector of strings indicating which subjects to return event intensities from
+#' @param markers A string or vector of strings indicating which markers to return event intensities from
 #' @return A data frame containing arcsinh-transformed event intensities from the events satisfying the requested filters. For any filter field without a specified value, all possible events will be returned.
 #'
 #' @author Mario G Rosasco
@@ -270,7 +270,7 @@ getEventIntensities <- function(experiment, cellSubsets = NA, metaclusters = NA,
   metaclusterIndices <-
     data.frame(metacluster = experiment$colIndices) %>%
     tibble::rownames_to_column("sampRpClust") %>%
-    dplyr::filter(.data$metacluster %in% metaclusters)
+    dplyr::filter(metacluster %in% metaclusters)
 
   # filter the data
   rowsToUse <- (experiment$mergedExpr$samp %in% subjects) & (experiment$mergedExpr$cellSubset %in% cellSubsets)
@@ -281,8 +281,8 @@ getEventIntensities <- function(experiment, cellSubsets = NA, metaclusters = NA,
     # merge in metacluster indices and filter out metaclusters to exclude
     dplyr::inner_join(metaclusterIndices, by = "sampRpClust") %>%
     dplyr::rename(
-      cluster = .data$sampRpClust,
-      subject = .data$samp
+      cluster = sampRpClust,
+      subject = samp
     )
 
   return(intensityData)
@@ -379,18 +379,18 @@ getEventZScores <- function(experiment, cellSubsets = NA, metaclusters = NA, sub
   message("Computing per-subject standard deviations...")
   parentStdDev <-
     experiment$mergedExpr %>%
-    dplyr::select(-.data$cellSubset, -.data$RPclust, -.data$sampRpClust) %>%
+    dplyr::select(-cellSubset, -RPclust, -sampRpClust) %>%
     unique() %>% # remove duplicated rows; mergedExpr has both parent and gated
-    dplyr::group_by(.data$samp) %>%
+    dplyr::group_by(samp) %>%
     dplyr::summarise_all(sd) %>%
     tidyr::gather("marker", "subjectStdDev", -.data$samp)
 
   message("Computing per-subject means...")
   parentMean <-
     experiment$mergedExpr %>%
-    dplyr::select(-.data$cellSubset, -.data$RPclust, -.data$sampRpClust) %>%
+    dplyr::select(-cellSubset, -RPclust, -sampRpClust) %>%
     unique() %>% # remove duplicated rows; mergedExpr has both parent and gated
-    dplyr::group_by(.data$samp) %>%
+    dplyr::group_by(samp) %>%
     dplyr::summarise_all(mean) %>%
     tidyr::gather("marker", "subjectMean", -.data$samp)
 
@@ -401,7 +401,7 @@ getEventZScores <- function(experiment, cellSubsets = NA, metaclusters = NA, sub
   metaclusterIndices <-
     data.frame(metacluster = experiment$colIndices) %>%
     tibble::rownames_to_column("sampRpClust") %>%
-    dplyr::filter(.data$metacluster %in% metaclusters)
+    dplyr::filter(metacluster %in% metaclusters)
 
   # filter the data and make into long format to compute z-scores
   message("Filtering data and computing event z-scores...")
@@ -423,11 +423,11 @@ getEventZScores <- function(experiment, cellSubsets = NA, metaclusters = NA, sub
     # merge in stdev and mean
     dplyr::inner_join(parentMeanStdDev, by = c("subject" = "samp", "marker" = "marker")) %>%
     # compute z-score
-    dplyr::mutate(zScore = (.data$value-.data$subjectMean)/.data$subjectStdDev) %>%
+    dplyr::mutate(zScore = (value - subjectMean) / subjectStdDev) %>%
     # reformat data
-    dplyr::select(.data$subject, .data$cellSubset, .data$marker, .data$zScore, .data$cluster, .data$metacluster, .data$event) %>%
+    dplyr::select(subject, cellSubset, marker, zScore, cluster, metacluster, event) %>%
     tidyr::spread("marker", "zScore") %>%
-    dplyr::select(-.data$event)
+    dplyr::select(-event)
 
   return(zScoreData)
 }
@@ -808,9 +808,9 @@ testNormalizationMethodByMarker <- function(
 #' Calculate UMAP coordinates for the cells from a discovrExperiment object 
 #'
 #' This function generates a UMAP from the cells in a discovrExperiment object.
-#' To do this, it extracts the marker scores for each cells, z-scores the
-#' expression values within each sample (similar to the briDiscovr
-#' metaclustering process), optionally downsamples the cells to speed the
+#' To do this, either uses normalized data in the discovrExperiment object or
+#' applies normalization to each marker similar to the briDiscovr normalization
+#' / metaclustering process, optionally downsamples the cells to speed the
 #' process (with downsampling frequency tunable at the cell population level),
 #' and then runs the UMAP algorithm. The UMAP algorithm is run using the
 #' \code{umap} package, which is a wrapper for the \code{uwot} package. Results
@@ -899,7 +899,7 @@ testNormalizationMethodByMarker <- function(
 #' cell information as element 'data' and the UMAP output object as element
 #' 'umapObject'.
 #' If \code{returnExpressionNormalizedScaled} is TRUE, the data frame also
-#' contains the z-scored expression values for the markers used in the UMAP.
+#' contains the normalized expression values for the markers used in the UMAP.
 runUmapDiscovrExperiment <- function(
     experiment,
     umapMarkers = NULL,

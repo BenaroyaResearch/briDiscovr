@@ -15,13 +15,13 @@ getEventIntensities(
 \arguments{
 \item{experiment}{A metaclustered discovrExperiment}
 
-\item{cellSubsets}{A string or vector of strings indicating which cell subsets to return event z-scores from}
+\item{cellSubsets}{A string or vector of strings indicating which cell subsets to return event intensities from}
 
-\item{metaclusters}{An integer or vector of integers indicating which metaclusters to return event z-scores from}
+\item{metaclusters}{An integer or vector of integers indicating which metaclusters to return event intensities from}
 
-\item{subjects}{A string or vector of strings indicating which subjects to return event z-scores from}
+\item{subjects}{A string or vector of strings indicating which subjects to return event intensities from}
 
-\item{markers}{A string or vector of strings indicating which markers to return event z-scores from}
+\item{markers}{A string or vector of strings indicating which markers to return event intensities from}
 }
 \value{
 A data frame containing arcsinh-transformed event intensities from the events satisfying the requested filters. For any filter field without a specified value, all possible events will be returned.

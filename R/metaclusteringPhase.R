@@ -138,7 +138,7 @@ metaclusterDiscovrExperiment <- function(
     dplyr::rename(subject = samp)
 
   #########################################################################
-  # Section 3.c from original SOP - calculate z-scores
+  # Section 3.c from original SOP - format data for metaclustering
   #########################################################################
   ##### lines 257-299 - not mentioned in SOP, but sets up data for next section
 
@@ -190,7 +190,6 @@ metaclusterDiscovrExperiment <- function(
     reshape2::melt(id.vars = c("subject", "RPclust")) %>%
     dplyr::rename(marker = variable, mean = value) %>%
     merge(subjectMeansNormalizedScaled, by = c("subject", "marker")) %>%
-    ## Apply z-score here!
     mutate(
       subjectNormalizedScaled = mean,
       sampRpClust = paste0(subject, "_", RPclust)
@@ -201,13 +200,23 @@ metaclusterDiscovrExperiment <- function(
       marker,
       subjectNormalizedScaled
     ) %>%
-    merge(clustSigPass, by="sampRpClust")
+    merge(clustSigPass, by = "sampRpClust")
 
   # Extract the normalized scaled means for all subjects
   allSubsetAllSubjectNormalizedScaled <-
     hmapDfAllSubsets %>%
     reshape2::dcast(marker ~ sampRpClust, value.var = "subjectNormalizedScaled") %>%
     tibble::column_to_rownames("marker")
+
+  # Also extract means of arcsinh-transformed values for all subjects, in same format
+  allSubsetAllSubjectArcsinh <-
+    experiment$clusterMeans %>%
+    ungroup() %>%
+    dplyr::filter(RPclust != "Total_Parent") %>%
+    dplyr::select(sampRpClust, all_of(rownames(allSubsetAllSubjectNormalizedScaled))) %>%
+    tibble::column_to_rownames("sampRpClust") %>%
+    t() %>%
+    as.data.frame()
 
   # use ComplexHeatmap as a convenient way of applying metaclustering
   metaxHeatmap <- 
@@ -272,7 +281,7 @@ metaclusterDiscovrExperiment <- function(
   experiment$hmapDfAllSubsets                     <- hmapDfAllSubsets
   experiment$pctInClusterThreshold                <- pctInClusterThreshold
   experiment$allSubsetAllSubjectNormalizedScaled  <- allSubsetAllSubjectNormalizedScaled
-  # experiment$allSubsetAllSubjectArcsinh           <- allSubsetAllSubjectArcsinh
+  experiment$allSubsetAllSubjectArcsinh           <- allSubsetAllSubjectArcsinh
   experiment$subsetEventCounting                  <- subsetEventCounting
   experiment$metaclusterMarkers                   <- metaclusterMarkers
   experiment$nMetaclusters                        <- nMetaclusters

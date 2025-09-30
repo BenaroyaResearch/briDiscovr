@@ -1,4 +1,4 @@
-## Copyright (C) 2020  Mario Rosasco and Benaroya Research Institute
+## Copyright (C) 2025  Matt Dufort, Mario Rosasco, and Benaroya Research Institute
 ##
 ## This file is part of the briDiscovr package
 
@@ -21,28 +21,27 @@
 #' @param metaclusterColors An optional vector of color values to use to label metaclusters in heatmaps.
 #' If left as the default 'NA', a random list of visually distinct colors will be generated.
 #' Note that if a color vector is supplied, it must contain at least as many colors as there are metaclusters. (default: NA)
-#' @param zScoreBreaks A vector of numbers indicating the values used to calibrate the Z score color scale. This vector
-#' must have the same number of values as \code{zScoreColors}. (default: c(-2,0,2))
-#' @param zScoreColors A vector of strings indicating the colors used to represent the Z score value range. This vector
-#' must have the same number of values as \code{zScoreBreaks}. (default: c("#00FFFF", "#000000", "#FDE725"))
+#' @param normCountBreaks A vector of numbers indicating the values used to calibrate the normalized count color scale. This vector
+#' must have the same number of values as \code{normCountColors}. (default: c(-2,0,2))
+#' @param normCountColors A vector of strings indicating the colors used to represent the normalized count value range. This vector
+#' must have the same number of values as \code{normCountBreaks}. (default: c("#00FFFF", "#000000", "#FDE725"))
 #' @param intensityBreaks A vector of numbers indicating the values used to calibrate the transformed marker intensity
 #' scale. This vector must have the same number of values as \code{intensityColors} (default: c(0,2,4,6))
 #' @param intensityColors A vector of strings indicating the colors used to represent the transformed marker intensity
 #' value range. This vector must have the same number of values as \code{intensityBreaks}
 #' (default: c("#4A0E53", "#925F54", "#D6B343", "#FDE727"))
 #' @param columnDendHeight A numeric indicating the column dendrogram height (in mm)
-#' for the Z score cluster phenotypes heatmap (default: 10)
+#' for the normalized count cluster phenotypes heatmap (default: 10)
 #' @param rowDendWidth A numeric indicating the row dendrogram width (in mm)
-#' for the Z score cluster phenotypes heatmap (default: 10)
+#' for the normalized count cluster phenotypes heatmap (default: 10)
 #' @param verbose A boolean specifying whether to display processing messages (default: TRUE)
 #' @return An S3 object of class \code{discovrExperiment}
 #'
 #' @seealso \code{\link{setupDiscovrExperiment}} \code{\link{clusterDiscovrExperiment}} \code{\link{metaclusterDiscovrExperiment}}
-#' @author Mario G Rosasco, Virginia Muir
+#' @author Mario G Rosasco, Virginia Muir, Matt Dufort
 #' @import dplyr
 #' @importFrom tibble rownames_to_column
 #' @importFrom stringr str_remove str_extract
-#' @importFrom rlang .data
 #' @importFrom grDevices colorRampPalette dev.off png
 #' @importFrom grid unit
 #' @importFrom circlize colorRamp2
@@ -54,8 +53,8 @@ makeMetaclusterHeatmaps <- function(
   filenamePrefix = NA,
   parentTitle = "Parent",
   metaclusterColors = NA,
-  zScoreBreaks = c(-2,0,2),
-  zScoreColors = c("#00FFFF", "#000000", "#FDE725"),
+  normCountBreaks = c(-2,0,2),
+  normCountColors = c("#00FFFF", "#000000", "#FDE725"),
   intensityBreaks = c(0,2,4,6),
   intensityColors = c("#4A0E53", "#925F54", "#D6B343", "#FDE727"),
   columnDendHeight = 10,
@@ -77,10 +76,10 @@ makeMetaclusterHeatmaps <- function(
       "Please see the function 'metaclusterDiscovrExperiment' for details on metaclustering an experiment."
     )
   }
-  if(!all(c("hmapDfAllSubsets", "allSubsetAllSubjectZscores", "allSubsetAllSubjectArcsinh") %in% names(experiment))){
+  if(!all(c("hmapDfAllSubsets", "allSubsetAllSubjectArcsinh", "allSubsetAllSubjectNormalizedScaled") %in% names(experiment))){
     stop(
       "The object does not have the data expected in a metaclustered experiment. ",
-      "Please re-run the clustering and metaclustering steps and try again."
+      "Please re-run the clustering, normalization, and metaclustering steps and try again."
     )
   }
 
@@ -130,6 +129,9 @@ makeMetaclusterHeatmaps <- function(
     )
   }
 
+  # disable ComplexHeatmap messages for less distraction
+  ComplexHeatmap::ht_opt(message = FALSE)
+  
   # Set up the file name prefix
   if(is.na(filenamePrefix)){
     filenamePrefix <- format(Sys.Date(), "%y%m%d-")
@@ -160,15 +162,15 @@ makeMetaclusterHeatmaps <- function(
   marker_label_gp = grid::gpar(fontsize = 13)
 
   # Set up palettes for the heatmap
-  if(length(zScoreBreaks) != length(zScoreColors)){
-    stop("zScoreBreaks and zScoreColors must be the same length.")
+  if(length(normCountBreaks) != length(normCountColors)){
+    stop("normCountBreaks and normCountColors must be the same length.")
   }
   if(length(intensityBreaks) != length(intensityColors)){
     stop("intensityBreaks and intensityColors must be the same length.")
   }
-  my_zscore_pal <- circlize::colorRamp2(
-    breaks = zScoreBreaks,
-    colors = zScoreColors
+  my_norm_count_pal <- circlize::colorRamp2(
+    breaks = normCountBreaks,
+    colors = normCountColors
   )
   my_arcsinh_pal <- circlize::colorRamp2(
     breaks = intensityBreaks,
@@ -176,15 +178,15 @@ makeMetaclusterHeatmaps <- function(
   )
 
   # Set up legend labels to accurately represent the data
-  zScoreMaxLabel = ifelse(
-    max(zScoreBreaks) < max(experiment$allSubsetAllSubjectZscores),
-    paste0("> ", max(zScoreBreaks)),
-    max(zScoreBreaks)
+  normCountMaxLabel = ifelse(
+    max(normCountBreaks) < max(experiment$allSubsetAllSubjectNormalizedScaled),
+    paste0("> ", max(normCountBreaks)),
+    max(normCountBreaks)
   )
-  zScoreMinLabel = ifelse(
-    min(zScoreBreaks) > min(experiment$allSubsetAllSubjectZscores),
-    paste0("< ", min(zScoreBreaks)),
-    min(zScoreBreaks)
+  normCountMinLabel = ifelse(
+    min(normCountBreaks) > min(experiment$allSubsetAllSubjectNormalizedScaled),
+    paste0("< ", min(normCountBreaks)),
+    min(normCountBreaks)
   )
   intensityMaxLabel = ifelse(
     max(intensityBreaks) < max(experiment$allSubsetAllSubjectArcsinh),
@@ -197,18 +199,18 @@ makeMetaclusterHeatmaps <- function(
     min(intensityBreaks)
   )
   intensityBreaks = sort(intensityBreaks)
-  zScoreBreaks = sort(zScoreBreaks)
+  normCountBreaks = sort(normCountBreaks)
 
   intensityBreakLabels = intensityBreaks
   intensityBreakLabels[1] = intensityMinLabel
   intensityBreakLabels[length(intensityBreakLabels)] = intensityMaxLabel
-  zScoreBreakLabels = zScoreBreaks
-  zScoreBreakLabels[1] = zScoreMinLabel
-  zScoreBreakLabels[length(zScoreBreakLabels)] = zScoreMaxLabel
+  normCountBreakLabels = normCountBreaks
+  normCountBreakLabels[1] = normCountMinLabel
+  normCountBreakLabels[length(normCountBreakLabels)] = normCountMaxLabel
 
-  zScoreLegendParam = list(
-    at = zScoreBreaks,
-    labels = zScoreBreakLabels
+  normCountLegendParam = list(
+    at = normCountBreaks,
+    labels = normCountBreakLabels
   )
   intensityLegendParam = list(
     at = intensityBreaks,
@@ -226,24 +228,25 @@ makeMetaclusterHeatmaps <- function(
   # Section 3.d from original SOP - create heatmaps
   #########################################################################
 
-  allSubsetZscoreAnnoDf <-
+  allSubsetNormCountAnnoDf <-
     experiment$hmapDfAllSubsets %>%
-    dplyr::select(.data$sampRpClust, !!subsets) %>%
-    unique %>%
-    dplyr::slice(match(colnames(experiment$allSubsetAllSubjectZscores), .data$sampRpClust)) %>%
+    dplyr::select(sampRpClust, all_of(subsets)) %>%
+    unique() %>%
+    dplyr::slice(match(colnames(experiment$allSubsetAllSubjectNormalizedScaled),
+                       dplyr::pull(., sampRpClust))) %>%
     dplyr::left_join(
       data.frame(group = experiment$colIndices) %>% rownames_to_column("sampRpClust"),
       by = "sampRpClust"
     ) %>%
-    dplyr::mutate(subject = str_replace(.data$sampRpClust, "_[0-9]+$", ""))
+    dplyr::mutate(subject = str_replace(sampRpClust, "_[0-9]+$", ""))
 
   if(length(childSubsets > 0)){
-    allSubsetZscoreAnnoDf <-
-      dplyr::select(allSubsetZscoreAnnoDf, .data$subject, .data$group,  parentSubset, !!childSubsets)
+    allSubsetNormCountAnnoDf <-
+      dplyr::select(allSubsetNormCountAnnoDf, subject, group, all_of(parentSubset), all_of(childSubsets))
   } else {
     if(verbose){message("No child subsets specified. Making plots for parent population only.")}
-    allSubsetZscoreAnnoDf <-
-      dplyr::select(allSubsetZscoreAnnoDf, .data$subject, .data$group,  parentSubset)
+    allSubsetNormCountAnnoDf <-
+      dplyr::select(allSubsetNormCountAnnoDf, subject, group, all_of(parentSubset))
   }
 
 
@@ -253,7 +256,7 @@ makeMetaclusterHeatmaps <- function(
   # left_join(select(clinical_vars, ID, progression = `Progression rate`, duration = Duration), by = c("subject" = "ID"))
 
   # set up colors as a named list
-  allSubsetZscoreAnnoColors <-
+  allSubsetNormCountAnnoColors <-
     list(
       subject = setNames(
         subject_id_colors$color,
@@ -270,61 +273,63 @@ makeMetaclusterHeatmaps <- function(
   subsetEventCounting <- left_join(
     experiment$subsetEventCounting,
     data.frame(
-      sampRpClust = colnames(experiment$allSubsetAllSubjectZscores),
+      sampRpClust = colnames(experiment$allSubsetAllSubjectNormalizedScaled),
       group = experiment$colIndices
-    )
+    ),
+    by = "sampRpClust"
   )
 
   ## Use for pct rare subset color scheme
   for (t in c(parentSubset, childSubsets)){
-    allSubsetZscoreAnnoColors[[t]] = c(
+    allSubsetNormCountAnnoColors[[t]] = c(
       setNames("white", 0),
       setNames(colorRampPalette(c("grey95", "grey0"))(100), seq(0.01, 1.00, 0.01))
     )
   }
 
-  allSubsetZscoreAnno <-
+  allSubsetNormCountAnno <-
     ComplexHeatmap::HeatmapAnnotation(
-      df = allSubsetZscoreAnnoDf %>% mutate_all(function(val){ifelse(is.na(val), 0, val)}),
-      col = allSubsetZscoreAnnoColors,
+      df = allSubsetNormCountAnnoDf %>% mutate_all(function(val){ifelse(is.na(val), 0, val)}),
+      col = allSubsetNormCountAnnoColors,
       show_annotation_name = T,
       show_legend = F)
 
-  zscore_hmap <- ComplexHeatmap::Heatmap(
-    as.matrix(experiment$allSubsetAllSubjectZscores[experiment$metaclusterMarkers,]),
-    col = my_zscore_pal,
-    name = "z-score",
+  norm_count_hmap <- ComplexHeatmap::Heatmap(
+    as.matrix(experiment$allSubsetAllSubjectNormalizedScaled[experiment$metaclusterMarkers,]),
+    col = my_norm_count_pal,
+    name = "Normalized count",
     # column styling
     column_title = paste0("Cluster Phenotypes from All Samples"),
     column_title_gp = titleFontParam,
-    column_dend_height=unit(columnDendHeight, "mm"),
+    column_dend_height = unit(columnDendHeight, "mm"),
     clustering_method_columns = experiment$linkage,
     show_column_names = FALSE,
     # row styling
     cluster_rows = TRUE,
     clustering_method_rows = experiment$linkage,
-    row_dend_width=unit(rowDendWidth, "mm"),
+    row_dend_width = unit(rowDendWidth, "mm"),
     row_names_gp = marker_label_gp,
     # overall styling
-    top_annotation = allSubsetZscoreAnno,
-    heatmap_legend_param = zScoreLegendParam
+    top_annotation = allSubsetNormCountAnno,
+    heatmap_legend_param = normCountLegendParam
   )
+  norm_count_hmap <- ComplexHeatmap::draw(norm_count_hmap)
 
-  # write the primary z-score heatmap to a file
+  # write the primary normalized count heatmap to a file
   png(
-    filename = paste0(filenamePrefix, "_allClusters_zScore.png"),
+    filename = paste0(filenamePrefix, "_allClusters_normCount.png"),
     width = exportWidth,
     height = exportHeight
   )
-  print(zscore_hmap)
+  print(norm_count_hmap)
   dev.off()
 
   #################################################################################
-  # set marker order for other plots based on the z-score heatmap,
+  # set marker order for other plots based on the normalized count heatmap,
   # and identify any non-clustering markers to show in detached heatmaps
-  markerOrderIndices = ComplexHeatmap::row_order(zscore_hmap)
-  zscoreRownames = rownames(experiment$allSubsetAllSubjectZscores[experiment$metaclusterMarkers,])
-  markerOrder = zscoreRownames[markerOrderIndices]
+  markerOrderIndices = ComplexHeatmap::row_order(norm_count_hmap)
+  normCountRownames = rownames(experiment$allSubsetAllSubjectNormalizedScaled[experiment$metaclusterMarkers,])
+  markerOrder = normCountRownames[markerOrderIndices]
 
   additionalMarkers = setdiff(experiment$hmapDfAllSubsets$marker, experiment$metaclusterMarkers)
   additionalMarkers = setdiff(additionalMarkers, dropMarkers)
@@ -336,19 +341,24 @@ makeMetaclusterHeatmaps <- function(
     height = exportHeight
   )
   print(ComplexHeatmap::Heatmap(
-    experiment$allSubsetAllSubjectArcsinh[markerOrder,],
+    # put allSubsetAllSubjectArcsinh in same order as allSubsetAllSubjectNormalizedScaled
+    as.matrix(
+      experiment$allSubsetAllSubjectArcsinh[
+        markerOrder,
+        match(colnames(experiment$allSubsetAllSubjectNormalizedScaled),
+              colnames(experiment$allSubsetAllSubjectArcsinh))]),
     col = my_arcsinh_pal,
     name = "MFI",
     column_title = paste0("Cluster Phenotypes from All Samples"),
     column_title_gp = titleFontParam,
     cluster_columns = F,
-    column_order = ComplexHeatmap::column_order(zscore_hmap),
+    column_order = ComplexHeatmap::column_order(norm_count_hmap),
     cluster_rows = F,
     row_order = markerOrder,
     gap = unit(5, "mm"),
     show_column_names = F,
     row_names_gp = marker_label_gp,
-    top_annotation = allSubsetZscoreAnno,
+    top_annotation = allSubsetNormCountAnno,
     heatmap_legend_param = intensityLegendParam)
   )
   dev.off()
@@ -361,33 +371,35 @@ makeMetaclusterHeatmaps <- function(
     dplyr::rowwise() %>%
     mutate(
       n_event = sum(c_across(subsets)),
-      subj = stringr::str_remove(.data$sampRpClust, "_[0-9]+$"),
-      RP_clust = stringr::str_extract(.data$sampRpClust, "[0-9]+$")
+      subj = stringr::str_remove(sampRpClust, "_[0-9]+$"),
+      RP_clust = stringr::str_extract(sampRpClust, "[0-9]+$")
     ) %>%
     dplyr::ungroup() %>%
-    dplyr::group_by(.data$subj) %>%
-    dplyr::mutate(subj_event = sum(.data$n_event)) %>%
+    dplyr::group_by(subj) %>%
+    dplyr::mutate(subj_event = sum(n_event)) %>%
     dplyr::ungroup() %>%
-    dplyr::mutate(proportion = .data$n_event/.data$subj_event) %>%
-    dplyr::mutate_at(experiment$markerInfo$commonMarkerName, list(~.*.data$proportion)) %>%
+    dplyr::mutate(proportion = n_event / subj_event) %>%
+    dplyr::mutate(across(any_of(experiment$markerInfo$commonMarkerName), ~ .x * proportion)) %>%
     dplyr::select(
-      -.data$sampRpClust,
-      -!!subsets,
-      -.data$n_event,
-      -.data$subj,
-      -.data$RP_clust,
-      -.data$subj_event) %>%
-    dplyr::group_by(.data$group) %>%
+      -sampRpClust,
+      -all_of(subsets),
+      -n_event,
+      -subj,
+      -RP_clust,
+      -subj_event) %>%
+    dplyr::group_by(group) %>%
     dplyr::summarise_all(sum) %>%
-    dplyr::mutate_at(experiment$markerInfo$commonMarkerName, list(~./.data$proportion)) %>%
-    dplyr::select(-.data$group, -.data$proportion) %>%
-    t
+    dplyr::mutate(across(any_of(experiment$markerInfo$commonMarkerName), ~ .x / proportion)) %>%
+    dplyr::select(-group, -proportion) %>%
+    t()
 
   colnames(perMetaclusterAvg) = 1:experiment$nMetaclusters
 
   # set up data frame for annotation bar for average hmap
   tmr_avg_anno_df <-
-    data.frame(group = colnames(perMetaclusterAvg))
+    data.frame(
+      group = factor(colnames(perMetaclusterAvg),
+                     levels = colnames(perMetaclusterAvg)))
 
   # set up colors as a named list
   tmr_avg_anno_colors <- list(
@@ -419,18 +431,21 @@ makeMetaclusterHeatmaps <- function(
     labels = avgIntensityBreakLabels
   )
 
-  tmr_avg_anno <- ComplexHeatmap::HeatmapAnnotation(df = tmr_avg_anno_df,
-                                    col = tmr_avg_anno_colors,
-                                    show_annotation_name = T,
-                                    show_legend = T)
-
+  tmr_avg_anno <-
+    ComplexHeatmap::HeatmapAnnotation(
+      df = tmr_avg_anno_df,
+      col = tmr_avg_anno_colors,
+      show_annotation_name = T,
+      show_legend = T)
+  
 
   # Metacluster average heatmap - metaclustering markers
   tmr_hm <- ComplexHeatmap::Heatmap(
-    perMetaclusterAvg[markerOrder,],
+    as.matrix(perMetaclusterAvg[markerOrder,]),
     col = my_arcsinh_pal,
     name = "MFI",
-    column_title = paste(experiment$nMetaclusters, "Metaclusters - Weighted Average MFI"),
+    column_title =
+      paste(experiment$nMetaclusters, "Metaclusters - Weighted Average MFI"),
     column_title_gp = titleFontParam,
     cluster_columns = F,
     cluster_rows = F,
@@ -452,9 +467,7 @@ makeMetaclusterHeatmaps <- function(
   print(tmr_hm)
   dev.off()
 
-
-
-  ## Weighted Average phenotype for total CD8s
+  ## Weighted Average phenotype for total parent population
   # weighted by proportion of cells in a subject (not by number of cells) in order to allow
   # equivalent contributions from subjects with disparate numbers of collected events
   parentPopulationAvg <-
@@ -464,27 +477,31 @@ makeMetaclusterHeatmaps <- function(
     dplyr::rowwise() %>%
     dplyr::mutate(
       n_event = sum(c_across(subsets)),
-      subj = stringr::str_remove(.data$sampRpClust, "_[0-9]+$"),
-      RP_clust = stringr::str_extract(.data$sampRpClust, "[0-9]+$")
+      subj = stringr::str_remove(sampRpClust, "_[0-9]+$"),
+      RP_clust = stringr::str_extract(sampRpClust, "[0-9]+$")
     ) %>%
     dplyr::ungroup() %>%
-    dplyr::group_by(.data$subj) %>%
-    dplyr::mutate(subj_event = sum(.data$n_event)) %>%
+    dplyr::group_by(subj) %>%
+    dplyr::mutate(subj_event = sum(n_event)) %>%
     dplyr::ungroup() %>%
-    dplyr::mutate(proportion = .data$n_event/.data$subj_event) %>%
-    dplyr::mutate_at(experiment$markerInfo$commonMarkerName, list(~.*.data$proportion)) %>%
+    dplyr::mutate(proportion = n_event / subj_event) %>%
+    dplyr::mutate(
+      across(any_of(experiment$markerInfo$commonMarkerName), 
+             ~ .x * proportion)) %>%
     dplyr::select(
-      -.data$sampRpClust,
-      -!!subsets,
-      -.data$n_event,
-      -.data$subj,
-      -.data$RP_clust,
-      -.data$subj_event
+      -sampRpClust,
+      -all_of(subsets),
+      -n_event,
+      -subj,
+      -RP_clust,
+      -subj_event
     ) %>%
     dplyr::summarise_all(sum) %>%
-    dplyr::mutate_at(experiment$markerInfo$commonMarkerName, list(~./.data$proportion)) %>%
-    dplyr::select(-.data$proportion) %>%
-    t
+    dplyr::mutate(
+      across(any_of(experiment$markerInfo$commonMarkerName),
+             ~ .x / proportion)) %>%
+    dplyr::select(-proportion) %>%
+    t()
 
   colnames(parentPopulationAvg) = parentTitle
 
@@ -492,7 +509,7 @@ makeMetaclusterHeatmaps <- function(
 
   # Total Marker Average - metaclustering markers
   parentWeightedAvgHeatmap <- ComplexHeatmap::Heatmap(
-    parentPopulationAvg[markerOrder,],
+    as.matrix(parentPopulationAvg[markerOrder,]),
     col = my_arcsinh_pal,
     name = "MFI",
     column_title = paste0("Total ", parentTitle),
@@ -505,7 +522,7 @@ makeMetaclusterHeatmaps <- function(
     row_names_gp = marker_label_gp,
     heatmap_legend_param = avgIntensityLegendParam
   )
-
+  
   png(filename = paste0(filenamePrefix, "_total", parentTitle, "_arcsinh_weightedAvg.png"),
       width = 700,
       height = 2500,
@@ -520,29 +537,35 @@ makeMetaclusterHeatmaps <- function(
     png(
       filename = paste0(filenamePrefix, "_allClusters_nonClusteringMarkers_MFI.png"),
       width = exportWidth,
-      height = exportHeight * (length(additionalMarkers)/length(markerOrder))
+      height = exportHeight * (length(additionalMarkers) / length(markerOrder))
     )
     print(ComplexHeatmap::Heatmap(
-      experiment$allSubsetAllSubjectArcsinh[additionalMarkers,, drop=FALSE],
+      # put allSubsetAllSubjectArcsinh in same order as allSubsetAllSubjectNormalizedScaled
+      as.matrix(
+        experiment$allSubsetAllSubjectArcsinh[
+          additionalMarkers,
+          match(colnames(experiment$allSubsetAllSubjectNormalizedScaled),
+                colnames(experiment$allSubsetAllSubjectArcsinh)),
+          drop = FALSE]),
       col = my_arcsinh_pal,
       name = "MFI",
       column_title = paste0("Cluster Phenotypes from All Samples (Non-Clustering Markers)"),
       column_title_gp = titleFontParam,
       cluster_columns = F,
-      column_order = ComplexHeatmap::column_order(zscore_hmap),
+      column_order = ComplexHeatmap::column_order(norm_count_hmap),
       cluster_rows = F,
       row_order = additionalMarkers,
       gap = unit(5, "mm"),
       show_column_names = F,
       row_names_gp = marker_label_gp,
-      top_annotation = allSubsetZscoreAnno,
+      top_annotation = allSubsetNormCountAnno,
       heatmap_legend_param = intensityLegendParam)
     )
     dev.off()
 
     # Total Marker Average - additional markers
     parentWeightedAvgHeatmap <- ComplexHeatmap::Heatmap(
-      parentPopulationAvg[additionalMarkers,, drop=FALSE],
+      as.matrix(parentPopulationAvg[additionalMarkers,, drop = FALSE]),
       col = my_arcsinh_pal,
       name = "MFI",
       column_title = paste0("Total ", parentTitle),
@@ -567,7 +590,7 @@ makeMetaclusterHeatmaps <- function(
 
     # Metacluster average heatmap - additional markers
     tmr_hm <- ComplexHeatmap::Heatmap(
-      perMetaclusterAvg[additionalMarkers,, drop=FALSE],
+      as.matrix(perMetaclusterAvg[additionalMarkers,, drop = FALSE]),
       col = my_arcsinh_pal,
       name = "MFI",
       column_title = paste(experiment$nMetaclusters, "Metaclusters - Weighted Average MFI (Non-Clustering Markers)"),
@@ -585,15 +608,14 @@ makeMetaclusterHeatmaps <- function(
     png(
       filename = paste0(filenamePrefix, "_nonClusteringMarkers_arcsinh_weightedAvgByClust.png"),
       width = 2500,
-      height = 2500 * (length(additionalMarkers)/length(markerOrder)),
+      height = 2500 * (length(additionalMarkers) / length(markerOrder)),
       res = 300
     )
     print(tmr_hm)
     dev.off()
   }
 
-
-  #########################################################################
-  # Section 3.e from original SOP - export data
-  #########################################################################
+  # enable ComplexHeatmap messages
+  ComplexHeatmap::ht_opt(message = TRUE)
+  
 }

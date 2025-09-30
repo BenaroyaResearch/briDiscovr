@@ -424,6 +424,7 @@ clusterDiscovrExperiment <- function(
     dplyr::group_by(samp, RPclust) %>%
     dplyr::summarise_all(mean) %>%
     dplyr::mutate(RPclust = as.character(RPclust))
+  # maybe should ungroup here, but concerned about breaking things
   
 
   ##################################
@@ -434,6 +435,7 @@ clusterDiscovrExperiment <- function(
     dplyr::group_by(samp) %>%
     dplyr::summarise_all(mean) %>%
     dplyr::mutate(RPclust = "Total_Parent")
+  # maybe should ungroup here, but concerned about breaking things
 
   # Count cells of each subpopulation (eg Tmr) in each phenograph cluster (from each sample)
   clusterRarePopCts <-
@@ -442,6 +444,7 @@ clusterDiscovrExperiment <- function(
     dplyr::group_by(samp, RPclust) %>%
     dplyr::summarise(Total = n(), .groups = "drop_last") %>%
     as.data.frame()
+  # maybe should ungroup here, but concerned about breaking things
 
   uniqueSubsets <- unique(experiment$mergedExpr$cellSubset)
 
@@ -452,6 +455,7 @@ clusterDiscovrExperiment <- function(
       group_by(samp, RPclust) %>%
       summarise(number = sum(cellSubset == currCellSubset)) %>%
       as.data.frame()
+    # maybe should ungroup here, but concerned about breaking things
     clusterRarePopCts <- cbind(clusterRarePopCts, additionalMatrix$number)
   }
 
@@ -464,6 +468,7 @@ clusterDiscovrExperiment <- function(
     group_by(samp) %>%
     summarise_all(sum) %>%
     rename_at(vars(-samp), function(name) paste0(name,"_tot"))
+  # maybe should ungroup here, but concerned about breaking things
 
   clusterRarePopCts <- left_join(clusterRarePopCts, aggregateCounts)
 

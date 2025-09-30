@@ -105,13 +105,13 @@ If \code{returnUmapObject} is TRUE, returns a list with the data frame of
 cell information as element 'data' and the UMAP output object as element
 'umapObject'.
 If \code{returnExpressionNormalizedScaled} is TRUE, the data frame also
-contains the z-scored expression values for the markers used in the UMAP.
+contains the normalized expression values for the markers used in the UMAP.
 }
 \description{
 This function generates a UMAP from the cells in a discovrExperiment object.
-To do this, it extracts the marker scores for each cells, z-scores the
-expression values within each sample (similar to the briDiscovr
-metaclustering process), optionally downsamples the cells to speed the
+To do this, either uses normalized data in the discovrExperiment object or
+applies normalization to each marker similar to the briDiscovr normalization
+/ metaclustering process, optionally downsamples the cells to speed the
 process (with downsampling frequency tunable at the cell population level),
 and then runs the UMAP algorithm. The UMAP algorithm is run using the
 \code{umap} package, which is a wrapper for the \code{uwot} package. Results

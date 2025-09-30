@@ -11,8 +11,8 @@ makeMetaclusterHeatmaps(
   filenamePrefix = NA,
   parentTitle = "Parent",
   metaclusterColors = NA,
-  zScoreBreaks = c(-2, 0, 2),
-  zScoreColors = c("#00FFFF", "#000000", "#FDE725"),
+  normCountBreaks = c(-2, 0, 2),
+  normCountColors = c("#00FFFF", "#000000", "#FDE725"),
   intensityBreaks = c(0, 2, 4, 6),
   intensityColors = c("#4A0E53", "#925F54", "#D6B343", "#FDE727"),
   columnDendHeight = 10,
@@ -44,11 +44,11 @@ with the format YYMMDD. (default: NA)}
 If left as the default 'NA', a random list of visually distinct colors will be generated.
 Note that if a color vector is supplied, it must contain at least as many colors as there are metaclusters. (default: NA)}
 
-\item{zScoreBreaks}{A vector of numbers indicating the values used to calibrate the Z score color scale. This vector
-must have the same number of values as \code{zScoreColors}. (default: c(-2,0,2))}
+\item{normCountBreaks}{A vector of numbers indicating the values used to calibrate the normalized count color scale. This vector
+must have the same number of values as \code{normCountColors}. (default: c(-2,0,2))}
 
-\item{zScoreColors}{A vector of strings indicating the colors used to represent the Z score value range. This vector
-must have the same number of values as \code{zScoreBreaks}. (default: c("#00FFFF", "#000000", "#FDE725"))}
+\item{normCountColors}{A vector of strings indicating the colors used to represent the normalized count value range. This vector
+must have the same number of values as \code{normCountBreaks}. (default: c("#00FFFF", "#000000", "#FDE725"))}
 
 \item{intensityBreaks}{A vector of numbers indicating the values used to calibrate the transformed marker intensity
 scale. This vector must have the same number of values as \code{intensityColors} (default: c(0,2,4,6))}
@@ -58,10 +58,10 @@ value range. This vector must have the same number of values as \code{intensityB
 (default: c("#4A0E53", "#925F54", "#D6B343", "#FDE727"))}
 
 \item{columnDendHeight}{A numeric indicating the column dendrogram height (in mm)
-for the Z score cluster phenotypes heatmap (default: 10)}
+for the normalized count cluster phenotypes heatmap (default: 10)}
 
 \item{rowDendWidth}{A numeric indicating the row dendrogram width (in mm)
-for the Z score cluster phenotypes heatmap (default: 10)}
+for the normalized count cluster phenotypes heatmap (default: 10)}
 
 \item{verbose}{A boolean specifying whether to display processing messages (default: TRUE)}
 }
@@ -75,5 +75,5 @@ Generate heatmaps from a metaclustered experiment
 \code{\link{setupDiscovrExperiment}} \code{\link{clusterDiscovrExperiment}} \code{\link{metaclusterDiscovrExperiment}}
 }
 \author{
-Mario G Rosasco, Virginia Muir
+Mario G Rosasco, Virginia Muir, Matt Dufort
 }
