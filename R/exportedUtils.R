@@ -620,7 +620,7 @@ checkFcsFiles <- function(
 #' for each row in the file at fcsInfoFile, with the row numbers of events to 
 #' be included. This object should be passed to \code{setupDiscovrExperiment}
 #' via argument \code{downsampleVectorList} to enforce the downsampling. If 
-#' \code{downsampleMode == "writeFiles"}, \code{NULL} is returned.
+#' \code{downsampleMode == "writeFiles"}, invisibly returns \code{NULL}.
 #' 
 #' @details Files specified in \code{fcsInfoFile} are checked for a number of
 #' potential issues, including missing paths, no events, and byte offset issues.
@@ -678,7 +678,7 @@ downsampleFcsList <- function(
     # generate new FCS info file with updated path names
     fcsInfoDownsampled <- fcsInfo
     fcsInfoDownsampled$filename <-
-      file.path(dirname(fcsInfoDownsampled$filename), paste0("downsampled_", basename(fcsInfoDownsampled$filename)))
+      file.path(outdirFcsFilesDownsampled, paste0("downsampled_", basename(fcsInfoDownsampled$filename)))
     write.csv(fcsInfoDownsampled, file = outfileFcsInfoDownsampled, row.names = FALSE)
     
     # read in original FCS files, and write out downsampled FCS files
@@ -692,7 +692,7 @@ downsampleFcsList <- function(
       write.FCS(currFcs, filename = fcsInfoDownsampled$filename[currRow])
     }
   }
-  return()
+  invisible(NULL)
 }
 
 #' Test a range of normalization options on a marker in a discovrExperiment

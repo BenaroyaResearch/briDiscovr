@@ -57,7 +57,7 @@ Depends on \code{downsampleMode}. If
 for each row in the file at fcsInfoFile, with the row numbers of events to 
 be included. This object should be passed to \code{setupDiscovrExperiment}
 via argument \code{downsampleVectorList} to enforce the downsampling. If 
-\code{downsampleMode == "writeFiles"}, \code{NULL} is returned.
+\code{downsampleMode == "writeFiles"}, invisibly returns \code{NULL}.
 }
 \description{
 This function downsamples a set of FCS cytometry data files to a maximum
