@@ -18,7 +18,9 @@ plotDensityNormalizedExprsDiscovrExperiment(
 \item{experiment}{A discovrExperiment created using
 \code{clusterDiscovrExperiment}, \code{normalizeDiscovrExperiment},
 \code{metaclusterDiscovrExperiment}. Must have status "clustered",
-"normalized", or "metaclustered".}
+"normalized", or "metaclustered". If it has status "clustered", it will be
+passed to \code{normalizeDiscovrExperiment} along with any relevant
+arguments prior to plotting.}
 
 \item{clusteringMarkersOnly}{(default: NULL)}
 
@@ -27,7 +29,11 @@ information on how to normalize, passed to \code{normalizeDiscovrExperiment}
 (see documentation of that function for usage details). If this argument
 is non-null, normalization will be performed prior to plotting, even if the
 'experiment' object has already been normalized. This allows for testing a
-range of normalization approaches on a discovrExperiment object. A non-null
+range of normalization approaches on a discovrExperiment object. If
+\code{experiment} has status "clustered", it must either have a non-null
+value for this argument, or must contain normalization methods in the
+markerInfo element, per the documentation for
+\code{normalizeDiscovrExperiment}.
 value must be provided if \code{experiment} has status "clustered" or does
 not contain the element \code{mergedExprNormalizedScaled} which is generated
 by \code{normalizeDiscovrExperiment}.}

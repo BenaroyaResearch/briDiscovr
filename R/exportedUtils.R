@@ -1216,14 +1216,20 @@ runUmapDiscovrExperiment <- function(
 #' @param experiment A discovrExperiment created using
 #' \code{clusterDiscovrExperiment}, \code{normalizeDiscovrExperiment},
 #' \code{metaclusterDiscovrExperiment}. Must have status "clustered",
-#' "normalized", or "metaclustered".
+#' "normalized", or "metaclustered". If it has status "clustered", it will be
+#' passed to \code{normalizeDiscovrExperiment} along with any relevant
+#' arguments prior to plotting.
 #' @param clusteringMarkersOnly (default: NULL)
 #' @param normalizationInfo (default: NULL) Optional object containing
 #' information on how to normalize, passed to \code{normalizeDiscovrExperiment}
 #' (see documentation of that function for usage details). If this argument
 #' is non-null, normalization will be performed prior to plotting, even if the
 #' 'experiment' object has already been normalized. This allows for testing a
-#' range of normalization approaches on a discovrExperiment object. A non-null
+#' range of normalization approaches on a discovrExperiment object. If
+#' \code{experiment} has status "clustered", it must either have a non-null
+#' value for this argument, or must contain normalization methods in the
+#' markerInfo element, per the documentation for
+#' \code{normalizeDiscovrExperiment}.
 #' value must be provided if \code{experiment} has status "clustered" or does
 #' not contain the element \code{mergedExprNormalizedScaled} which is generated
 #' by \code{normalizeDiscovrExperiment}.
@@ -1260,18 +1266,21 @@ plotDensityNormalizedExprsDiscovrExperiment <- function(
     stop("The input 'experiment' must have status 'clustered', 'normalized', 'metaclustered' in order to use this function. ",
          "The provided 'experiment' object has status ", experiment$status)
   
-  # # normalize expression values if normalizationInfo is non-null
-  # if(!is.null(normalizationInfo)) {
-  #   experiment <- normalizeDiscovrExperiment(experiment, normalizationInfo = normalizationInfo, ...)
-  # # check that normalized expression values are present, or normalizationInfo is provided
-  # } else if(experiment$status %in% c("normalized", "metaclustered")) {
-  #   if(is.null(experiment$mergedExprNormalizedScaled))
-  #     stop("The input 'experiment' has status", experiment$status, " but does not include normalized expression values.\n",
-  #          "Please ensure that it is run through 'normalizeDiscovrExperiment'")
-  # } else if(experiment$status == "clustered") {
-  #   stop("The input 'experiment' has status 'clustered'. In order to run this function on a 'clustered' discovrExperiment object, ",
-  #        "you must provide a non-null input for 'normalizationInfo' that can be passed to 'normalizedDiscovrExperiment'.")
-  # }
+  # normalize expression values if normalizationInfo is non-null or status is "clustered"
+  if(experiment$status %in% "clustered" || !is.null(normalizationInfo)) {
+    if(experiment$status %in% "clustered") {
+      message("The input 'experiment' has status 'clustered'. Normalization will be run prior to plotting.")
+    } else {
+      message("Detected input 'normalizationInfo'. Updated normalization will be run prior to plotting.")
+    }
+    experiment <-
+      normalizeDiscovrExperiment(experiment, normalizationInfo = normalizationInfo, ...)
+  }
+  
+  # check that mergedExprNormalizedScaled is present
+  if(is.null(experiment$mergedExprNormalizedScaled))
+    stop("The input 'experiment' but does not include normalized expression values.\n",
+         "Please ensure that it has been properly run through 'normalizeDiscovrExperiment'.")
   
   # determine markers to plot
   if(isTRUE(clusteringMarkersOnly)) {
@@ -1308,7 +1317,6 @@ plotDensityNormalizedExprsDiscovrExperiment <- function(
             ")"))
   }
   
-
   # output plots if specified to do so
   if(!is.null(filenameOut)) {
     # check extension and open plotting device

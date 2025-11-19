@@ -560,7 +560,7 @@ normalizeDiscovrExperiment <- function(
   
   # check experiment$mergedExpr for validity (shouldn't be necessary, but including to head off some edge cases)
   if(!is.data.frame(experiment$mergedExpr))
-    stop("'mergedExpr' element within the experiment object is not a data.frame; please check inputs to 'normalizeScaleMergedExpr'")
+    stop("'mergedExpr' element within the experiment object is not a data.frame; please check inputs")
   if(!("samp" %in% colnames(experiment$mergedExpr))) {
     stop(
       paste("Normalization of marker expression cannot be performed if 'mergedExpr' element",
