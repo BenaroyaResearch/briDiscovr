@@ -91,7 +91,9 @@ myExpt <- setupDiscovrExperiment(
 )
 ```
 
-This will load in the .fcs files, check for any issues with the data, clean the marker names, and transform the event data using an arcsinh transform. For details on the appropriate transformation parameters for CyTOF and FACS data, please see `?setupDiscovrExperiment`.
+This will load in the .fcs files, check for any issues with the data, clean the marker names, and transform the event data using an arcsinh transform.
+
+**NOTE**: The arcsinh transformation values used in `setupDiscovrExperiment` can substantially affect downstream results. Standard values differ for CyTOF, standard flow cytometry, and spectral flow cytometry. In particular, the appropriate value used for `arcsinhB` is specific to data type. Typical values for `arcsinhB`: 1/5 for CyTOF data, 1/150 for standard flow cytometry, 1/5000 for spectral flow cytometry.
 
 If you have run downsampling and generated a list of vectors for downsampling the input .fcs files, this can be passed to `setupDiscovrExperiment()` using the argument `downsampleVectorList`.
 
