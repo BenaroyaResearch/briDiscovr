@@ -17,7 +17,7 @@ LazyData: true
 RoxygenNote: 7.3.2
 LinkingTo: 
     Rcpp
-biocViews:
+biocViews: FlowCytometry, Software, Clustering, Visualization
 Imports: 
     rlang,
     igraph(>= 1.0.1),
