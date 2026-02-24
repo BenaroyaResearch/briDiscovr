@@ -12,23 +12,17 @@ Functions implementing and supporting the "Distribution analysis across clusters
   * If you're using Windows, you'll need to install Rtools40 from https://cran.r-project.org/bin/windows/Rtools/ as well
 2. Open R and install devtools using ```install.packages("devtools")```
 3. Install this package using ```devtools::install_github("BenaroyaResearch/briDiscovr")```
-  * If you encounter difficulties with any dependency packages, please see the "Dependencies" section at the bottom of this page.
+  * `devtools` will automatically install all dependencies, including Bioconductor packages (`flowCore`, `flowStats`, `ComplexHeatmap`), by reading the `Additional_repositories` field in the package's `DESCRIPTION`.
 
 ### Installing with renv
 
-If your project uses [renv](https://rstudio.github.io/renv/) for reproducible dependency management, note that `briDiscovr` depends on several [Bioconductor](https://bioconductor.org/) packages (`flowCore`, `flowStats`, `ComplexHeatmap`). You must configure Bioconductor repositories before installing:
+If your project uses [renv](https://rstudio.github.io/renv/) for reproducible dependency management, you can install `briDiscovr` directly from GitHub using:
 
 ```R
-# Install BiocManager if not already available
-if (!requireNamespace("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-
-# Add Bioconductor repositories so renv can find Bioconductor packages
-options(repos = BiocManager::repositories())
-
-# Install briDiscovr from GitHub
 renv::install("BenaroyaResearch/briDiscovr")
 ```
+
+`briDiscovr`'s `DESCRIPTION` declares Bioconductor as an `Additional_repositories` source, so `renv` will automatically find and install Bioconductor dependencies (`flowCore`, `flowStats`, `ComplexHeatmap`) without any extra configuration.
 
 After installation, run `renv::snapshot()` to record the package in your project's `renv.lock` file. The entry will look like (renv fills in the `RemoteSha` and `Hash` automatically at snapshot time):
 
@@ -309,19 +303,19 @@ umapObj %>%
 
 ## Dependencies
 
-This package depends on bioconductor packages, which may run into issues when installing automatically. If you encounter any difficulties during installation, you can manually install the bioconductor dependencies using the following code:
+This package depends on Bioconductor packages (`flowCore`, `flowStats`, `ComplexHeatmap`). These are declared in the `Additional_repositories` field of the package's `DESCRIPTION`, so installation tools like `devtools::install_github()` and `renv::install()` will find and install them automatically.
+
+If you encounter any difficulties with automatic installation of the Bioconductor packages, you can install them manually using:
 
 ```R
 if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
     
-BiocManager::install("flowCore")
-BiocManager::install("flowStats")
-BiocManager::install("ComplexHeatmap")
+BiocManager::install(c("flowCore", "flowStats", "ComplexHeatmap"))
 ```
 
-The remaining dependencies should be automatically installed via CRAN, but if you encounter any issues you can manually install using the following code:
+The remaining dependencies are available from CRAN. If needed, they can be installed manually using:
 
 ```R
-install.packages(pkgs=c("rlang", "igraph", "RANN", "Rcpp", "methods", "tidyverse", "reshape2", "RColorBrewer", "circlize", "viridisLite", "grid", "memuse", "umap")
+install.packages(pkgs=c("rlang", "igraph", "RANN", "Rcpp", "methods", "tidyverse", "reshape2", "RColorBrewer", "circlize", "viridisLite", "grid", "memuse", "umap"))
 ```
