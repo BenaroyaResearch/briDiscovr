@@ -16,9 +16,17 @@ Functions implementing and supporting the "Distribution analysis across clusters
 
 ### Installing with renv
 
-If your project uses [renv](https://rstudio.github.io/renv/) for reproducible dependency management, you can install `briDiscovr` directly from GitHub using:
+If your project uses [renv](https://rstudio.github.io/renv/) for reproducible dependency management, note that `briDiscovr` depends on several [Bioconductor](https://bioconductor.org/) packages (`flowCore`, `flowStats`, `ComplexHeatmap`). You must configure Bioconductor repositories before installing:
 
 ```R
+# Install BiocManager if not already available
+if (!requireNamespace("BiocManager", quietly = TRUE))
+  install.packages("BiocManager")
+
+# Add Bioconductor repositories so renv can find Bioconductor packages
+options(repos = BiocManager::repositories())
+
+# Install briDiscovr from GitHub
 renv::install("BenaroyaResearch/briDiscovr")
 ```
 
