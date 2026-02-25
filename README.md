@@ -16,21 +16,25 @@ Functions implementing and supporting the "Distribution analysis across clusters
 
 ### Installing with renv
 
-If your project uses [renv](https://rstudio.github.io/renv/) for reproducible dependency management, you can install `briDiscovr` directly:
+If your project uses [renv](https://rstudio.github.io/renv/) for reproducible dependency management, first configure Bioconductor repositories, then install:
 
 ```R
+# Step 1: Install BiocManager (needed to set up Bioconductor repositories)
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+# Step 2: Add Bioconductor repositories so renv can find flowCore, flowStats, etc.
+options(repos = BiocManager::repositories())
+
+# Step 3: Install briDiscovr (this will also install all dependencies)
 renv::install("BenaroyaResearch/briDiscovr")
 ```
 
-The package's `DESCRIPTION` includes a `Remotes` field that tells `renv` to fetch Bioconductor dependencies (`flowCore`, `flowStats`, `ComplexHeatmap`) from Bioconductor automatically.
-
-If you encounter issues, ensure Bioconductor repositories are configured in your session first:
+**Troubleshooting**: If you get `package 'flowCore' is not available`, renv may be using a cached download. Clear the cache and retry:
 
 ```R
-if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager")
-options(repos = BiocManager::repositories())
-renv::install("BenaroyaResearch/briDiscovr")
+# Clear renv's download cache, then re-run the steps above
+renv::purge("briDiscovr")
 ```
 
 After installation, run `renv::snapshot()` to record the package in your project's `renv.lock` file. The entry will look like (renv fills in the `RemoteSha` and `Hash` automatically at snapshot time):
@@ -312,7 +316,7 @@ umapObj %>%
 
 ## Dependencies
 
-This package depends on Bioconductor packages (`flowCore`, `flowStats`, `ComplexHeatmap`). These are declared in the `Remotes` and `Additional_repositories` fields of the package's `DESCRIPTION`, so both `renv::install()` and `devtools::install_github()` will find and install them automatically.
+This package depends on Bioconductor packages (`flowCore`, `flowStats`, `ComplexHeatmap`). For `devtools::install_github()` these are resolved automatically via the `Additional_repositories` field. For `renv::install()`, you must configure Bioconductor repositories first (see [Installing with renv](#installing-with-renv) above).
 
 If you encounter any difficulties with automatic installation of the Bioconductor packages, you can install them manually using:
 
