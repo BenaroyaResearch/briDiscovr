@@ -16,17 +16,20 @@ Functions implementing and supporting the "Distribution analysis across clusters
 
 ### Installing with renv
 
-If your project uses [renv](https://rstudio.github.io/renv/) for reproducible dependency management, you need to configure Bioconductor repositories before installing `briDiscovr`, because `renv` does not read the `Additional_repositories` field from package DESCRIPTION files:
+If your project uses [renv](https://rstudio.github.io/renv/) for reproducible dependency management, you can install `briDiscovr` directly:
 
 ```R
-# 1. Install BiocManager if needed
+renv::install("BenaroyaResearch/briDiscovr")
+```
+
+The package's `DESCRIPTION` includes a `Remotes` field that tells `renv` to fetch Bioconductor dependencies (`flowCore`, `flowStats`, `ComplexHeatmap`) from Bioconductor automatically.
+
+If you encounter issues, ensure Bioconductor repositories are configured in your session first:
+
+```R
 if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
-
-# 2. Add Bioconductor repositories to renv's search path
 options(repos = BiocManager::repositories())
-
-# 3. Install briDiscovr
 renv::install("BenaroyaResearch/briDiscovr")
 ```
 
@@ -309,9 +312,7 @@ umapObj %>%
 
 ## Dependencies
 
-This package depends on Bioconductor packages (`flowCore`, `flowStats`, `ComplexHeatmap`). These are declared in the `Additional_repositories` field of the package's `DESCRIPTION`, so `devtools::install_github()` will find and install them automatically.
-
-For `renv` users, Bioconductor repositories must be configured before installation (see the [Installing with renv](#installing-with-renv) section above).
+This package depends on Bioconductor packages (`flowCore`, `flowStats`, `ComplexHeatmap`). These are declared in the `Remotes` and `Additional_repositories` fields of the package's `DESCRIPTION`, so both `renv::install()` and `devtools::install_github()` will find and install them automatically.
 
 If you encounter any difficulties with automatic installation of the Bioconductor packages, you can install them manually using:
 

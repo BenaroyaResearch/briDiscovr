@@ -22,6 +22,10 @@ Additional_repositories:
     https://bioconductor.org/packages/release/data/annotation,
     https://bioconductor.org/packages/release/data/experiment,
     https://bioconductor.org/packages/release/workflows
+Remotes:
+    bioc::flowCore,
+    bioc::flowStats,
+    bioc::ComplexHeatmap
 Imports: 
     rlang,
     igraph(>= 1.0.1),
