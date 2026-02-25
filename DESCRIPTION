@@ -17,11 +17,16 @@ LazyData: true
 RoxygenNote: 7.3.2
 LinkingTo: 
     Rcpp
-Additional_repositories: https://bioconductor.org/packages/release/bioc
-    https://bioconductor.org/packages/release/data/annotation
-    https://bioconductor.org/packages/release/data/experiment
+Additional_repositories:
+    https://bioconductor.org/packages/release/bioc,
+    https://bioconductor.org/packages/release/data/annotation,
+    https://bioconductor.org/packages/release/data/experiment,
     https://bioconductor.org/packages/release/workflows
 biocViews: FlowCytometry, Software, Clustering, Visualization
+Remotes:
+    bioc::flowCore,
+    bioc::flowStats,
+    bioc::ComplexHeatmap
 Imports: 
     rlang,
     igraph(>= 1.0.1),
