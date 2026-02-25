@@ -16,13 +16,19 @@ Functions implementing and supporting the "Distribution analysis across clusters
 
 ### Installing with renv
 
-If your project uses [renv](https://rstudio.github.io/renv/) for reproducible dependency management, you can install `briDiscovr` directly from GitHub using:
+If your project uses [renv](https://rstudio.github.io/renv/) for reproducible dependency management, you need to configure Bioconductor repositories before installing `briDiscovr`, because `renv` does not read the `Additional_repositories` field from package DESCRIPTION files:
 
 ```R
+# 1. Install BiocManager if needed
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+# 2. Add Bioconductor repositories to renv's search path
+options(repos = BiocManager::repositories())
+
+# 3. Install briDiscovr
 renv::install("BenaroyaResearch/briDiscovr")
 ```
-
-`briDiscovr`'s `DESCRIPTION` declares Bioconductor as an `Additional_repositories` source, so `renv` will automatically find and install Bioconductor dependencies (`flowCore`, `flowStats`, `ComplexHeatmap`) without any extra configuration.
 
 After installation, run `renv::snapshot()` to record the package in your project's `renv.lock` file. The entry will look like (renv fills in the `RemoteSha` and `Hash` automatically at snapshot time):
 
@@ -303,7 +309,9 @@ umapObj %>%
 
 ## Dependencies
 
-This package depends on Bioconductor packages (`flowCore`, `flowStats`, `ComplexHeatmap`). These are declared in the `Additional_repositories` field of the package's `DESCRIPTION`, so installation tools like `devtools::install_github()` and `renv::install()` will find and install them automatically.
+This package depends on Bioconductor packages (`flowCore`, `flowStats`, `ComplexHeatmap`). These are declared in the `Additional_repositories` field of the package's `DESCRIPTION`, so `devtools::install_github()` will find and install them automatically.
+
+For `renv` users, Bioconductor repositories must be configured before installation (see the [Installing with renv](#installing-with-renv) section above).
 
 If you encounter any difficulties with automatic installation of the Bioconductor packages, you can install them manually using:
 
