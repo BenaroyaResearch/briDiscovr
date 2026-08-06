@@ -41,36 +41,38 @@ metaclusterDiscovrExperiment <- function(
   linkage = "ward.D2",
   distance = "euclidean",
   verbose = TRUE
-){
-  if(!is.discovrExperiment(experiment)){
+) {
+  if (!is.discovrExperiment(experiment)) {
     stop(
       "The object passed to this function is not a valid DISCOV-R experiment object.\n",
       "Please create your experiment using the 'setupDiscovrExperiment' function\n",
       "and perform the initial clustering using the 'clusterDiscovrExperiment' function. "
     )
   }
-  if(!(experiment$status %in% c("clustered", "normalized"))){
+  if (!(experiment$status %in% c("clustered", "normalized"))) {
     stop(
       "The experiment must have status 'clustered' or 'normalized' in order to be ready for metaclustering.\n",
-      "The current experiment has a status of ", experiment$status, ".\n",
+      "The current experiment has a status of ",
+      experiment$status,
+      ".\n",
       "Please make sure to create your experiment using the 'setupDiscovrExperiment' function,\n",
       "perform the initial clustering using the 'clusterDiscovrExperiment' function,\n",
       "and optionally normalize marker expression using the 'normalizeDiscovrExperiment' function."
     )
   }
-  
-  if(experiment$status == "clustered"){
+
+  if (experiment$status == "clustered") {
     message(
       "The current experiment has been clustered, but has not yet had marker expression normalized using the\n",
       "'normalizeDiscovrExperiment' function. Normalization will now be performed prior to metaclustering,\n",
       "using the normalizationMethod specifications provided in 'markerInfo', or the default normalization method\n",
       "set in 'normalizeDiscovrExperiment'.\n",
       "NOTE: This is a change in workflow from briDiscovr version 0.3, which applied z-score normalization\n",
-      "as part of the metaclustering process.\n\n")
-    
+      "as part of the metaclustering process.\n\n"
+    )
+
     experiment <- normalizeDiscovrExperiment(experiment)
   }
-
 
   #########################################################################
   # Section 3.b.i-ix from original SOP - Set up metaclustering
@@ -82,17 +84,23 @@ metaclusterDiscovrExperiment <- function(
     experiment$clusterRarePopCts %>%
     dplyr::mutate(RPclust = as.character(RPclust)) %>%
     dplyr::mutate(sampRpClust = paste0(samp, "_", RPclust)) %>%
-    left_join(experiment$clusterMeansNormalizedScaled, by = c("samp", "RPclust")) %>%
+    left_join(
+      experiment$clusterMeansNormalizedScaled,
+      by = c("samp", "RPclust")
+    ) %>%
     dplyr::filter(!(samp %in% dropSamples)) %>%
     # Identify low abundance clusters (containing < threshold % of events per subject)
     dplyr::group_by(samp) %>%
     dplyr::mutate(totalEvents = sum(Total)) %>%
     dplyr::ungroup() %>%
-    dplyr::mutate(pctCellsInClust = (Total / totalEvents)*100) %>%
+    dplyr::mutate(pctCellsInClust = (Total / totalEvents) * 100) %>%
     dplyr::filter(pctCellsInClust >= pctInClusterThreshold)
 
   # get total parent cluster names for each sample to enable filtering
-  sampTotalParentNames <- unique(paste0(experiment$clusterMeansNormalizedScaled$samp, "_Total_Parent"))
+  sampTotalParentNames <- unique(paste0(
+    experiment$clusterMeansNormalizedScaled$samp,
+    "_Total_Parent"
+  ))
 
   # remove samples to be dropped and low-abundance clusters from mean data
   experiment$clusterMeans <-
@@ -102,7 +110,10 @@ metaclusterDiscovrExperiment <- function(
       RPclust = as.character(RPclust),
       sampRpClust = paste0(samp, "_", RPclust)
     ) %>%
-    dplyr::filter(sampRpClust %in% c(experiment$clusterRarePopCts$sampRpClust, sampTotalParentNames))
+    dplyr::filter(
+      sampRpClust %in%
+        c(experiment$clusterRarePopCts$sampRpClust, sampTotalParentNames)
+    )
   experiment$clusterMeansNormalizedScaled <-
     experiment$clusterMeansNormalizedScaled %>%
     dplyr::filter(!samp %in% dropSamples) %>%
@@ -110,7 +121,10 @@ metaclusterDiscovrExperiment <- function(
       RPclust = as.character(RPclust),
       sampRpClust = paste0(samp, "_", RPclust)
     ) %>%
-    dplyr::filter(sampRpClust %in% c(experiment$clusterRarePopCts$sampRpClust, sampTotalParentNames))
+    dplyr::filter(
+      sampRpClust %in%
+        c(experiment$clusterRarePopCts$sampRpClust, sampTotalParentNames)
+    )
 
   # remove samples to be dropped and low-abundance clusters from expr data
   experiment$mergedExpr <-
@@ -143,21 +157,23 @@ metaclusterDiscovrExperiment <- function(
   ##### lines 257-299 - not mentioned in SOP, but sets up data for next section
 
   # get list of markers to be used in metaclustering
-  metaclusterMarkers <- experiment$clusteringMarkers[!experiment$clusteringMarkers %in% dropMarkers]
+  metaclusterMarkers <- experiment$clusteringMarkers[
+    !experiment$clusteringMarkers %in% dropMarkers
+  ]
 
   # prepare data for each subset (ie: tmr)
   cellSubsets <- unique(experiment$fcsInfo$cellSubset)
   dfAllSubsets <- NULL
 
   # build dataset of unique clusters with event occupancy for each subset
-  for (currCellSubset in cellSubsets){
+  for (currCellSubset in cellSubsets) {
     dfAllSubsets <- dplyr::bind_rows(
       dfAllSubsets,
       experiment$clusterRarePopCts %>%
         dplyr::rename(subject = samp) %>%
         dplyr::filter(!!as.symbol(currCellSubset) > 0)
     ) %>%
-    distinct()
+      distinct()
   }
 
   # Get cluster occupancy data in easy to use format
@@ -166,27 +182,38 @@ metaclusterDiscovrExperiment <- function(
     dplyr::select(subject, RPclust, !!cellSubsets) %>%
     dplyr::mutate(sampRpClust = paste0(subject, "_", RPclust))
 
-  subsetEventCounting <- clustSigPass %>% dplyr::select(sampRpClust, !!cellSubsets)
+  subsetEventCounting <- clustSigPass %>%
+    dplyr::select(sampRpClust, !!cellSubsets)
 
   # for each subset (ie: tmr) compute the fraction of all events that fall in each cluster
-  for(currCellSubset in cellSubsets){
+  for (currCellSubset in cellSubsets) {
     currTot <- paste0("total", currCellSubset)
     clustSigPass <-
       clustSigPass %>%
       dplyr::group_by(subject) %>%
       dplyr::mutate(!!currTot := sum(!!rlang::sym(currCellSubset))) %>%
       dplyr::ungroup() %>%
-      dplyr::mutate(!!currCellSubset := !!rlang::sym(currCellSubset) / !!rlang::sym(currTot))
+      dplyr::mutate(
+        !!currCellSubset := !!rlang::sym(currCellSubset) / !!rlang::sym(currTot)
+      )
   }
 
   # round the fractional occupancy to 2 sig. digits and extract data w/ labels
-  clustSigPass[,cellSubsets] <- sapply(clustSigPass[,cellSubsets], round, digits = 2)
-  clustSigPass <- clustSigPass[,c("sampRpClust", cellSubsets)]
+  clustSigPass[, cellSubsets] <- sapply(
+    clustSigPass[, cellSubsets],
+    round,
+    digits = 2
+  )
+  clustSigPass <- clustSigPass[, c("sampRpClust", cellSubsets)]
 
   # Create main data object for plotting heatmaps
   hmapDfAllSubsets <-
     dfAllSubsets %>%
-    dplyr::select(subject, RPclust, any_of(experiment$markerInfo$commonMarkerName)) %>%
+    dplyr::select(
+      subject,
+      RPclust,
+      any_of(experiment$markerInfo$commonMarkerName)
+    ) %>%
     reshape2::melt(id.vars = c("subject", "RPclust")) %>%
     dplyr::rename(marker = variable, mean = value) %>%
     merge(subjectMeansNormalizedScaled, by = c("subject", "marker")) %>%
@@ -205,7 +232,10 @@ metaclusterDiscovrExperiment <- function(
   # Extract the normalized scaled means for all subjects
   allSubsetAllSubjectNormalizedScaled <-
     hmapDfAllSubsets %>%
-    reshape2::dcast(marker ~ sampRpClust, value.var = "subjectNormalizedScaled") %>%
+    reshape2::dcast(
+      marker ~ sampRpClust,
+      value.var = "subjectNormalizedScaled"
+    ) %>%
     tibble::column_to_rownames("marker")
 
   # Also extract means of arcsinh-transformed values for all subjects, in same format
@@ -213,26 +243,31 @@ metaclusterDiscovrExperiment <- function(
     experiment$clusterMeans %>%
     ungroup() %>%
     dplyr::filter(RPclust != "Total_Parent") %>%
-    dplyr::select(sampRpClust, all_of(rownames(allSubsetAllSubjectNormalizedScaled))) %>%
+    dplyr::select(
+      sampRpClust,
+      all_of(rownames(allSubsetAllSubjectNormalizedScaled))
+    ) %>%
     tibble::column_to_rownames("sampRpClust") %>%
     t() %>%
     as.data.frame()
 
   # use ComplexHeatmap as a convenient way of applying metaclustering
-  metaxHeatmap <- 
-    suppressMessages(  # suppress default messages from Heatmap
+  metaxHeatmap <-
+    suppressMessages(
+      # suppress default messages from Heatmap
       ComplexHeatmap::Heatmap(
-        as.matrix(allSubsetAllSubjectNormalizedScaled[metaclusterMarkers,]),
+        as.matrix(allSubsetAllSubjectNormalizedScaled[metaclusterMarkers, ]),
         clustering_method_columns = linkage,
         clustering_distance_columns = distance,
         clustering_method_rows = linkage,
         clustering_distance_rows = distance
       )
     )
-  
+
   # cut the heatmap dendrogram to get phenotypic metaclusters
   clusterDendrogram <-
-    suppressWarnings( # suppress warning messages from ComplexHeatmap
+    suppressWarnings(
+      # suppress warning messages from ComplexHeatmap
       as.hclust(ComplexHeatmap::column_dend(metaxHeatmap))
     )
   colIndices <- cutree(
@@ -251,46 +286,83 @@ metaclusterDiscovrExperiment <- function(
     dplyr::left_join(subsetEventCounting, by = "sampRpClust") %>%
     dplyr::mutate(subject = stringr::str_remove(sampRpClust, "_[0-9]+$"))
 
-  # for each subset (ie: tmr) compute the fraction of all events that fall in each cluster
-  for(currCellSubset in cellSubsets){
-    currTot <- paste0("total", currCellSubset)
+  # count the events of each cell subset in each (subject, metacluster) combination
+  for (currCellSubset in cellSubsets) {
     metaclusterOccupancy <-
-      dplyr::group_by(metaclusterOccupancy, subject) %>%
-      dplyr::mutate(!!currTot := sum(!!rlang::sym(currCellSubset))) %>%
-      dplyr::ungroup() %>%
-      dplyr::group_by(subject, metacluster) %>%
+      dplyr::group_by(metaclusterOccupancy, subject, metacluster) %>%
       dplyr::mutate(
-        !!paste0(currCellSubset, "_frac") := sum(!!rlang::sym(currCellSubset))/!!rlang::sym(currTot),
         !!paste0(currCellSubset, "_cts") := sum(!!rlang::sym(currCellSubset))
       ) %>%
       dplyr::ungroup()
   }
 
-  # extract relevant data w/ labels
-  cellsSubsetColnames <- c(paste0(cellSubsets, "_frac"), paste0(cellSubsets, "_cts"))
-  metaclusterOccupancy <- metaclusterOccupancy[,c("subject", "metacluster", cellsSubsetColnames)]
-  metaclusterOccupancy <- distinct(metaclusterOccupancy)
+  # extract counts w/ labels (fractions are computed after the grid is completed below)
+  ctsColnames <- paste0(cellSubsets, "_cts")
+  metaclusterOccupancy <- metaclusterOccupancy[, c(
+    "subject",
+    "metacluster",
+    ctsColnames
+  )]
+  metaclusterOccupancy <- dplyr::distinct(metaclusterOccupancy)
+
+  # A (subject, metacluster) combination is only present above when the subject
+  # contributed at least one cluster to that metacluster. Absent combinations
+  # represent zero occupancy rather than missing data, so complete the grid
+  # explicitly over all observed subjects and metaclusters, filling the added
+  # rows with zero counts.
+  ctsFill <- as.list(rep(0, length(ctsColnames)))
+  names(ctsFill) <- ctsColnames
+  metaclusterOccupancy <-
+    tidyr::complete(metaclusterOccupancy, subject, metacluster, fill = ctsFill)
+
+  # Recompute each subset's fraction as (counts in this metacluster) / (total
+  # counts for the subject), where the subject total is the sum of its
+  # per-metacluster counts. This reproduces the original fractions for occupied
+  # combinations, yields 0 for a subject absent from a metacluster but present
+  # elsewhere in that subset, and yields NaN (0 / 0) for a subject with no cells
+  # of that subset at all.
+  for (currCellSubset in cellSubsets) {
+    currCts <- paste0(currCellSubset, "_cts")
+    currFrac <- paste0(currCellSubset, "_frac")
+    metaclusterOccupancy <-
+      dplyr::group_by(metaclusterOccupancy, subject) %>%
+      dplyr::mutate(
+        !!currFrac := !!rlang::sym(currCts) / sum(!!rlang::sym(currCts))
+      ) %>%
+      dplyr::ungroup()
+  }
+
+  # reorder to the original output schema (subject, metacluster, *_frac, *_cts)
+  cellsSubsetColnames <- c(
+    paste0(cellSubsets, "_frac"),
+    paste0(cellSubsets, "_cts")
+  )
+  metaclusterOccupancy <- as.data.frame(metaclusterOccupancy[, c(
+    "subject",
+    "metacluster",
+    cellsSubsetColnames
+  )])
 
   ####################################################
   # attach data and return metaclustered experiment
   ####################################################
-  experiment$status                               <- "metaclustered"
+  experiment$status <- "metaclustered"
   # experiment$subjectMeanVar                       <- subjectMeanVar
-  experiment$dfAllSubsets                         <- dfAllSubsets
-  experiment$clustSigPass                         <- clustSigPass
-  experiment$hmapDfAllSubsets                     <- hmapDfAllSubsets
-  experiment$pctInClusterThreshold                <- pctInClusterThreshold
-  experiment$allSubsetAllSubjectNormalizedScaled  <- allSubsetAllSubjectNormalizedScaled
-  experiment$allSubsetAllSubjectArcsinh           <- allSubsetAllSubjectArcsinh
-  experiment$subsetEventCounting                  <- subsetEventCounting
-  experiment$metaclusterMarkers                   <- metaclusterMarkers
-  experiment$nMetaclusters                        <- nMetaclusters
-  experiment$metaclusterOccupancy                 <- metaclusterOccupancy
-  experiment$colIndices                           <- colIndices
-  experiment$kGroups                              <- kGroups
-  experiment$linkage                              <- linkage
-  experiment$distance                             <- distance
-  experiment$clusterDendrogram                    <- clusterDendrogram
+  experiment$dfAllSubsets <- dfAllSubsets
+  experiment$clustSigPass <- clustSigPass
+  experiment$hmapDfAllSubsets <- hmapDfAllSubsets
+  experiment$pctInClusterThreshold <- pctInClusterThreshold
+  experiment$allSubsetAllSubjectNormalizedScaled <- allSubsetAllSubjectNormalizedScaled
+  experiment$allSubsetAllSubjectArcsinh <- allSubsetAllSubjectArcsinh
+  experiment$subsetEventCounting <- subsetEventCounting
+  experiment$metaclusterMarkers <- metaclusterMarkers
+  experiment$nMetaclusters <- nMetaclusters
+  experiment$metaclusterOccupancy <- metaclusterOccupancy
+  experiment$colIndices <- colIndices
+  experiment$kGroups <- kGroups
+  experiment$linkage <- linkage
+  experiment$distance <- distance
+  experiment$clusterDendrogram <- clusterDendrogram
 
   return(experiment)
 }
@@ -320,22 +392,24 @@ recutMetaclusters <- function(
   linkage = "ward.D2",
   distance = "euclidean",
   verbose = TRUE
-){
-  if(!is.discovrExperiment(experiment)){
+) {
+  if (!is.discovrExperiment(experiment)) {
     stop(
       "The object passed to this function is not a valid DISCOV-R experiment object. ",
       "Please create your experiment using the 'setupDiscovrExperiment' function ",
       "and perform the initial clustering using the 'clusterDiscovrExperiment' function. "
     )
   }
-  if(experiment$status != "metaclustered"){
+  if (experiment$status != "metaclustered") {
     stop(
       "The experiment must have already been metaclustered in order to be re-cut using this function. ",
-      "The current experiment has a status of ", experiment$status, ". ",
+      "The current experiment has a status of ",
+      experiment$status,
+      ". ",
       "Please use the function 'metaclusterDiscovrExperiment' if performing metaclustering for the first time."
     )
   }
-  if(!"clusterDendrogram" %in% names(experiment)){
+  if (!"clusterDendrogram" %in% names(experiment)) {
     stop(
       "The object does not have the data expected in a metaclustered experiment. ",
       "Please re-run the clustering and metaclustering steps and try again."
@@ -344,19 +418,23 @@ recutMetaclusters <- function(
 
   # use ComplexHeatmap as a convenient way of applying metaclustering
   metaxHeatmap <-
-    suppressMessages(  # suppress default messages from Heatmap
+    suppressMessages(
+      # suppress default messages from Heatmap
       ComplexHeatmap::Heatmap(
-        as.matrix(experiment$allSubsetAllSubjectNormalizedScaled[experiment$metaclusterMarkers,]),
+        as.matrix(experiment$allSubsetAllSubjectNormalizedScaled[
+          experiment$metaclusterMarkers,
+        ]),
         clustering_method_columns = linkage,
         clustering_distance_columns = distance,
         clustering_method_rows = linkage,
         clustering_distance_rows = distance
       )
     )
-  
+
   # cut the heatmap dendrogram to get phenotypic metaclusters
   clusterDendrogram <-
-    suppressWarnings( # suppress warning messages from ComplexHeatmap
+    suppressWarnings(
+      # suppress warning messages from ComplexHeatmap
       as.hclust(ComplexHeatmap::column_dend(metaxHeatmap))
     )
   colIndices <- cutree(
@@ -375,34 +453,69 @@ recutMetaclusters <- function(
     dplyr::left_join(experiment$subsetEventCounting, by = "sampRpClust") %>%
     dplyr::mutate(subject = stringr::str_remove(sampRpClust, "_[0-9]+$"))
 
-  # for each subset (ie: tmr) compute the fraction of all events that fall in each cluster
+  # count the events of each cell subset in each (subject, metacluster) combination
   cellSubsets <- unique(experiment$fcsInfo$cellSubset)
 
-  for(currCellSubset in cellSubsets){
-    currTot <- paste0("total", currCellSubset)
+  for (currCellSubset in cellSubsets) {
     metaclusterOccupancy <-
-      dplyr::group_by(metaclusterOccupancy, subject) %>%
-      dplyr::mutate(!!currTot := sum(.data[[currCellSubset]])) %>%
-      dplyr::ungroup() %>%
-      dplyr::group_by(subject, metacluster) %>%
+      dplyr::group_by(metaclusterOccupancy, subject, metacluster) %>%
       dplyr::mutate(
-        !!paste0(currCellSubset, "_frac") := sum(.data[[currCellSubset]])/.data[[currTot]],
         !!paste0(currCellSubset, "_cts") := sum(.data[[currCellSubset]])
       ) %>%
       dplyr::ungroup()
   }
 
-  # extract relevant data w/ labels
-  cellsSubsetColnames = c(paste0(cellSubsets, "_frac"), paste0(cellSubsets, "_cts"))
-  metaclusterOccupancy <- metaclusterOccupancy[,c("subject", "metacluster", cellsSubsetColnames)]
-  metaclusterOccupancy <- unique(metaclusterOccupancy)
+  # extract counts w/ labels (fractions are computed after the grid is completed below)
+  ctsColnames <- paste0(cellSubsets, "_cts")
+  metaclusterOccupancy <- metaclusterOccupancy[, c(
+    "subject",
+    "metacluster",
+    ctsColnames
+  )]
+  metaclusterOccupancy <- dplyr::distinct(metaclusterOccupancy)
 
-  experiment$nMetaclusters                <- nMetaclusters
-  experiment$metaclusterOccupancy         <- metaclusterOccupancy
-  experiment$colIndices                   <- colIndices
-  experiment$kGroups                      <- kGroups
-  experiment$linkage                      <- linkage
-  experiment$distance                     <- distance
-  experiment$clusterDendrogram            <- clusterDendrogram
+  # A (subject, metacluster) combination is only present above when the subject
+  # contributed at least one cluster to that metacluster. Absent combinations
+  # represent zero occupancy rather than missing data, so complete the grid
+  # explicitly over all observed subjects and metaclusters, filling the added
+  # rows with zero counts.
+  ctsFill <- as.list(rep(0, length(ctsColnames)))
+  names(ctsFill) <- ctsColnames
+  metaclusterOccupancy <-
+    tidyr::complete(metaclusterOccupancy, subject, metacluster, fill = ctsFill)
+
+  # Recompute each subset's fraction as (counts in this metacluster) / (total
+  # counts for the subject), where the subject total is the sum of its
+  # per-metacluster counts. This reproduces the original fractions for occupied
+  # combinations, yields 0 for a subject absent from a metacluster but present
+  # elsewhere in that subset, and yields NaN (0 / 0) for a subject with no cells
+  # of that subset at all.
+  for (currCellSubset in cellSubsets) {
+    currCts <- paste0(currCellSubset, "_cts")
+    currFrac <- paste0(currCellSubset, "_frac")
+    metaclusterOccupancy <-
+      dplyr::group_by(metaclusterOccupancy, subject) %>%
+      dplyr::mutate(!!currFrac := .data[[currCts]] / sum(.data[[currCts]])) %>%
+      dplyr::ungroup()
+  }
+
+  # reorder to the original output schema (subject, metacluster, *_frac, *_cts)
+  cellsSubsetColnames <- c(
+    paste0(cellSubsets, "_frac"),
+    paste0(cellSubsets, "_cts")
+  )
+  metaclusterOccupancy <- as.data.frame(metaclusterOccupancy[, c(
+    "subject",
+    "metacluster",
+    cellsSubsetColnames
+  )])
+
+  experiment$nMetaclusters <- nMetaclusters
+  experiment$metaclusterOccupancy <- metaclusterOccupancy
+  experiment$colIndices <- colIndices
+  experiment$kGroups <- kGroups
+  experiment$linkage <- linkage
+  experiment$distance <- distance
+  experiment$clusterDendrogram <- clusterDendrogram
   return(experiment)
 }
