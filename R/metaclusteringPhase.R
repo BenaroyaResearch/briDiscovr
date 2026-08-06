@@ -173,7 +173,7 @@ metaclusterDiscovrExperiment <- function(
         dplyr::rename(subject = samp) %>%
         dplyr::filter(!!as.symbol(currCellSubset) > 0)
     ) %>%
-      distinct()
+      dplyr::distinct()
   }
 
   # Get cluster occupancy data in easy to use format
