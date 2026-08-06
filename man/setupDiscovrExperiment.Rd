@@ -37,7 +37,7 @@ containing columns named "subject", "cellSubset", and "filename". The
 "filename" field must contain paths to the .fcs files that will be used in
 analysis.}
 
-\item{parentPopulation}{A character sting indicating the name of the parent
+\item{parentPopulation}{A character string indicating the name of the parent
 population subset. Must match one of the values in the fcsInfoFile
 'cellSubset' column.}
 
