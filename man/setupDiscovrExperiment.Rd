@@ -28,16 +28,19 @@ or FALSE values. Markers with a TRUE value in this column will be used for
 clustering, whereas the others will not. An optional
 \code{normalizationMethod} can be included to specify the type of
 normalization to be used for each marker; options are "zScore", "none", and
-"warpSet". In addition, "warpSet" can include a peak number specification as
-a number immediately following (e.g. "warpSet2"). Normalization defaults to
-"zScore" for each and all markers if not specified.}
+"warpSet". In addition, "warpSet" can include a maximum peak number
+specification as a number immediately following (e.g. "warpSet2"). The
+effective number of landmarks is the smaller of that value and the number
+of peaks supported by the data, so requesting more peaks than the density
+estimates support has no effect. Normalization defaults to "zScore" for
+each and all markers if not specified.}
 
 \item{fcsInfoFile}{A character string indicating the path to a file
 containing columns named "subject", "cellSubset", and "filename". The
 "filename" field must contain paths to the .fcs files that will be used in
 analysis.}
 
-\item{parentPopulation}{A character string indicating the name of the parent
+\item{parentPopulation}{A character sting indicating the name of the parent
 population subset. Must match one of the values in the fcsInfoFile
 'cellSubset' column.}
 
