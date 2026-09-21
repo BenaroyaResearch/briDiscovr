@@ -17,9 +17,12 @@
 #' clustering, whereas the others will not. An optional
 #' \code{normalizationMethod} can be included to specify the type of
 #' normalization to be used for each marker; options are "zScore", "none", and
-#' "warpSet". In addition, "warpSet" can include a peak number specification as
-#' a number immediately following (e.g. "warpSet2"). Normalization defaults to
-#' "zScore" for each and all markers if not specified.
+#' "warpSet". In addition, "warpSet" can include a maximum peak number
+#' specification as a number immediately following (e.g. "warpSet2"). The
+#' effective number of landmarks is the smaller of that value and the number
+#' of peaks supported by the data, so requesting more peaks than the density
+#' estimates support has no effect. Normalization defaults to "zScore" for
+#' each and all markers if not specified.
 #' @param fcsInfoFile A character string indicating the path to a file
 #' containing columns named "subject", "cellSubset", and "filename". The
 #' "filename" field must contain paths to the .fcs files that will be used in
@@ -517,8 +520,15 @@ clusterDiscovrExperiment <- function(
 #' markers. Options for normalization are "zScore", "none", and "warpSet". In
 #' addition, "warpSet" can include a maximum peak number specification as a
 #' number immediately following (e.g. "warpSet2") - see documentation of
-#' \code{flowStats::warpSet} for details. Any markers lacking a specification
-#' will be normalized using the default method (currently "zScore").
+#' \code{flowStats::warpSet} for details. The effective number of landmarks is
+#' the smaller of that value and the number of peaks supported by the data, so
+#' requesting more peaks than the density estimates support has no effect. Note
+#' that this requires flowStats >= 4.22.1 from
+#' \url{https://github.com/BenaroyaResearch/flowStats}; released versions of
+#' flowStats silently ignore the requested peak number, making "warpSet1",
+#' "warpSet2" and "warpSet3" behave identically. Any markers lacking a
+#' specification will be normalized using the default method (currently
+#' "zScore").
 #' @param defaultNormalizationMethod (default: "zScore") A character string, the
 #' normalization method to use for markers without another method specified.
 #' Options are the same as in \code{normalizationInfo} above.

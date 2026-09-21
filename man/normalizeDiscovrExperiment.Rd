@@ -30,8 +30,15 @@ character value specifying the normalization method to be applied to all
 markers. Options for normalization are "zScore", "none", and "warpSet". In
 addition, "warpSet" can include a maximum peak number specification as a
 number immediately following (e.g. "warpSet2") - see documentation of
-\code{flowStats::warpSet} for details. Any markers lacking a specification
-will be normalized using the default method (currently "zScore").}
+\code{flowStats::warpSet} for details. The effective number of landmarks is
+the smaller of that value and the number of peaks supported by the data, so
+requesting more peaks than the density estimates support has no effect. Note
+that this requires flowStats >= 4.22.1 from
+\url{https://github.com/BenaroyaResearch/flowStats}; released versions of
+flowStats silently ignore the requested peak number, making "warpSet1",
+"warpSet2" and "warpSet3" behave identically. Any markers lacking a
+specification will be normalized using the default method (currently
+"zScore").}
 
 \item{defaultNormalizationMethod}{(default: "zScore") A character string, the
 normalization method to use for markers without another method specified.

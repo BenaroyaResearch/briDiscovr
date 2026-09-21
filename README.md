@@ -31,7 +31,7 @@ This file should contain 3 columns (plus 1 optional column):
 * A column for the common name of your marker (eg: "CD45RA") - by default this column is expected to be named 'fixed'
 * A column for the marker name as it's represented in the .fcs data (eg: "143Nd_CD45RA") - by default this column is expected to be named 'desc'
 * A column named 'useToCluster' that indicates whether the marker will be used for clustering. This column can only contain the values "TRUE" or "FALSE".
-* An optional column named 'normalizationMethod', containing the normalization to be applied to each marker prior to metaclustering. Acceptable values include "zScore", "none", "warpSet", and "warpSet#" where # is a value specifying the number of peaks for warpSet normalization. Any markers with NAs or empty cells will have the default normalization method applied, as will all markers if this column is missing. For more details please see `normalizeDiscovrExperiment` function documentation.
+* An optional column named 'normalizationMethod', containing the normalization to be applied to each marker prior to metaclustering. Acceptable values include "zScore", "none", "warpSet", and "warpSet#" where # is a value specifying the maximum number of peaks for warpSet normalization. The effective number of landmarks is the smaller of # and the number of peaks supported by the data, so requesting more peaks than the density estimates support has no effect. Any markers with NAs or empty cells will have the default normalization method applied, as will all markers if this column is missing. For more details please see `normalizeDiscovrExperiment` function documentation.
 
 Example "markerInformation.csv": 
 
@@ -277,9 +277,21 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
     install.packages("BiocManager")
     
 BiocManager::install("flowCore")
-BiocManager::install("flowStats")
 BiocManager::install("ComplexHeatmap")
 ```
+
+`flowStats` is installed from a Benaroya Research Institute fork rather than
+from Bioconductor:
+
+```R
+devtools::install_github("BenaroyaResearch/flowStats", ref = "bri")
+```
+
+The fork corrects a bug in `flowStats::warpSet` where the requested peak
+number was silently discarded, which made the "warpSet1", "warpSet2" and
+"warpSet3" normalization methods behave identically. Apart from that fix it
+is identical to the current Bioconductor release. Installing `flowStats`
+from Bioconductor instead will leave those methods indistinguishable.
 
 The remaining dependencies should be automatically installed via CRAN, but if you encounter any issues you can manually install using the following code:
 
