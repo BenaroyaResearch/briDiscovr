@@ -14,6 +14,37 @@ Functions implementing and supporting the "Distribution analysis across clusters
 3. Install this package using ```devtools::install_github("BenaroyaResearch/briDiscovr")```
   * If you encounter difficulties with any dependency packages, please see the "Dependencies" section at the bottom of this page.
 
+### Installing with renv
+
+If your project uses [renv](https://rstudio.github.io/renv/) for reproducible dependency management, you can install `briDiscovr` directly from GitHub using:
+
+```R
+renv::install("BenaroyaResearch/briDiscovr")
+```
+
+After installation, run `renv::snapshot()` to record the package in your project's `renv.lock` file. The entry will look like (renv fills in the `RemoteSha` and `Hash` automatically at snapshot time):
+
+```json
+"briDiscovr": {
+  "Package": "briDiscovr",
+  "Version": "0.4.4",
+  "Source": "GitHub",
+  "RemoteType": "github",
+  "RemoteHost": "api.github.com",
+  "RemoteRepo": "briDiscovr",
+  "RemoteUsername": "BenaroyaResearch",
+  "RemoteRef": "main",
+  "RemoteSha": "9a3dd19...",
+  "Hash": "..."
+}
+```
+
+Once the lockfile is committed, any collaborator can restore the exact environment — including `briDiscovr` — with a single call:
+
+```R
+renv::restore()
+```
+
 ---
 
 ## Usage
