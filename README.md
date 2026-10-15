@@ -1,15 +1,27 @@
 # briDiscovr
 
-Functions implementing and supporting the "Distribution analysis across clusters of a parent population overlaid with a rare subpopulation" (DISCOV-R) analysis method, published in Wiedeman, Muir, et al. 2020, "Autoreactive CD8+ T cell exhaustion distinguishes subjects with slow type 1 diabetes progression", [PMID 31815738](https://pubmed.ncbi.nlm.nih.gov/31815738/).
+**briDiscovr** is an R package for identifying and quantifying cell populations in high-dimensional cytometry data (CyTOF, conventional flow, and spectral flow). It uses clustering and cross-sample normalization to identify populations of cells present across samples, and quantifies cells in those clusters in each sample.
 
-**NB** - This code has been tested with R version 4.4.1. The change from R version 3.x to 4.x came with a number of substantial differences, and so while there's a possibility this package may work with earlier versions of R, it should be considered untested.
+The core workflow is:
+
+1. **Set up** an experiment from .fcs files and two simple .csv manifests (markers and samples), with arcsinh transformation and optional downsampling.
+2. **Cluster** the events within each sample separately (Phenograph).
+3. **Normalize** marker expression across samples, choosing for each marker between z-score, warpSet peak alignment, or no normalization.
+4. **Metacluster** the sample-specific clusters across all samples into shared cell populations.
+5. **Quantify and characterize** the metaclusters, with per-sample occupancy tables, heatmaps of marker expression, and UMAP embeddings.
+
+Clustering each sample on its own before metaclustering keeps sample-specific technical variation from driving the population definitions.
+
+The package can also place a rare cell subset in the context of a larger parent population. Examples are antigen-specific T or B cells identified by tetramer staining, compared with all CD8+ T cells or all B cells. The rare cells are clustered together with their parent population, and the package reports how they are distributed across the parent population's metaclusters. This was the original purpose of the method (DISCOV-R: *Distribution analysis across clusters of a parent population overlaid with a rare subpopulation*). It is still fully supported, but most analyses now use the core workflow above.
+
+> **Background and development status.** The DISCOV-R method was first developed for Wiedeman, Muir, et al. 2020, "Autoreactive CD8+ T cell exhaustion distinguishes subjects with slow type 1 diabetes progression", *J Clin Invest* ([PMID 31815738](https://pubmed.ncbi.nlm.nih.gov/31815738/)). The package is under continued development, and the current version differs from the code used in that paper. For example, version 0.4 added flexible per-marker normalization (see [Normalizing marker expression](#normalizing-marker-expression)), along with downsampling, UMAP, and memory and speed improvements. If you use briDiscovr, please cite the paper above and report the package version you used.
 
 ---
 
 ## Installation
 
 1. Install R v4.0+ from https://cloud.r-project.org/
-  * If you're using Windows, you'll need to install Rtools40 from https://cran.r-project.org/bin/windows/Rtools/ as well
+  * If you're using Windows, you'll need to install the version of Rtools that matches your R version from https://cran.r-project.org/bin/windows/Rtools/ as well
 2. Open R and install devtools using ```install.packages("devtools")```
 3. Install this package using ```devtools::install_github("BenaroyaResearch/briDiscovr")```
   * If you encounter difficulties with any dependency packages, please see the "Dependencies" section at the bottom of this page.
@@ -22,7 +34,7 @@ This package is based around the `discovrExperiment` object class, which is a li
 
 ### Preparing to start your analysis
 
-Before running DISCOV-R, you'll need to prepare a marker information file and an. fcs information file. Both of these can be created in Excel, and should be saved in the 'comma-separated values (.csv)' format.
+Before running DISCOV-R, you'll need to prepare a marker information file and a .fcs information file. Both of these can be created in Excel, and should be saved in the 'comma-separated values (.csv)' format.
 
 #### marker information file
 
@@ -45,10 +57,10 @@ Example "markerInformation.csv":
 
 This file should contain 3 columns:
 
-* A column named 'subject' indicating the subject/sample ID (eg: "SubjXpb997364476"). 
+* A column named 'subject' indicating the subject/sample ID (eg: "subject_123_sample_1"). 
   * Note that this should NOT start with a number.
 * A column named 'cellSubset' indicating the parent and child populations to be used in the analysis (eg: "A2_CD8_T_Cells")
-* A column named 'filename' indicating where to find the .fcs file for that patient and cell subset (eg: "/Users/mrosasco/Documents/projects/briUtils/briDiscovr/testFiles/Xpb997364476_A2_CD8_T_Cells.fcs"). 
+* A column named 'filename' indicating where to find the .fcs file for that patient and cell subset (eg: "/Users/mrosasco/Documents/projects/briUtils/briDiscovr/testFiles/subject_123_sample_1_A2_CD8_T_Cells.fcs"). 
   * Note that it's possible to use paths relative to your working directory, but it's generally preferred to provide an absolute path.
   
 
@@ -56,8 +68,8 @@ Example "fcsManifest.csv":
 
 | subject |	cellSubset | filename |
 | ------- | ---------- | -------- |
-| SubjXpb997364476 | A2_CD8_T_Cells | /Users/mrosasco/Documents/projects/briUtils/briDiscovr/testFiles/Xpb997364476_A2_CD8_T_Cells.fcs |
-| SubjXpb997364476 | A2_Er168+_EBV | /Users/mrosasco/Documents/projects/briUtils/briDiscovr/testFiles/Xpb997364476_A2_Er168+_EBV.fcs |
+| subject_123_sample_1 | A2_CD8_T_Cells | /Users/mrosasco/Documents/projects/briUtils/briDiscovr/testFiles/subject_123_sample_1_A2_CD8_T_Cells.fcs |
+| subject_123_sample_1 | A2_Er168+_EBV | /Users/mrosasco/Documents/projects/briUtils/briDiscovr/testFiles/subject_123_sample_1_A2_Er168+_EBV.fcs |
 | ... | ... | ... |
 
 ### Downsampling FCS files
@@ -109,15 +121,15 @@ print(myExpt)
 
 getSubjectCounts(myExpt)
 ## Prints out:
-#             sample nEvents
-# 1 SubjXpb997364476  172634
+#                 sample nEvents
+# 1 subject_123_sample_1  172634
 ```
 
 The experiment can then be saved using normal R data handling utilities. For example:
 
 ```R
-saveRDS(myExpt, "200709-testExpt.RDS")
-myExpt <- readRDS("200709-testExpt.RDS")
+saveRDS(myExpt, "testExpt.RDS")
+myExpt <- readRDS("testExpt.RDS")
 ```
 
 ### Clustering
@@ -139,17 +151,43 @@ print(myExpt)
 
 getSubjectClusters(myExpt)
 ## Prints:
-#             sample kClusters
-# 1 SubjXpb997364476        26
+#                 sample kClusters
+# 1 subject_123_sample_1        26
 ```
 
 ### Normalizing marker expression
 
-Normalization of marker expression is handled through the function `normalizeDiscovrExperiment()`. Prior to metaclustering, marker expression must be normalized across samples; mean normalized values for each sample-specific cluster are then used to form metacluster. The preferred normalization approach for each marker can be specified by including column 'normalizationMethod' in the markerInfo file, or by passing a value for the argument 'normalizationInfo' to `normalizeDiscovrExperiment()`. 
+Normalization of marker expression is handled through the function `normalizeDiscovrExperiment()`. Prior to metaclustering, marker expression must be normalized across samples; mean normalized values for each sample-specific cluster are then used to form metaclusters. The preferred normalization approach for each marker can be specified by including column 'normalizationMethod' in the markerInfo file, or by passing a value for the argument 'normalizationInfo' to `normalizeDiscovrExperiment()`. 
 
 Different normalization approaches can be evaluated for a subset of markers using the function `testNormalizationMethodByMarker()`.
 
-The effect of normalization, including variations on normalization tested as described above, can be checked using the function `plotDensityNormalizedExprsDiscovrExperiment()`, which outputs a plot of the pre- and post-normalization marker level distributions for each marker in each sample. It is recommended to check these distributions and modify the normalization method as needed so that distributions align well across samples - otherwise metaclusters may be identified that correspond to different cell populations in different sample.
+The effect of normalization, including variations on normalization tested as described above, can be checked using the function `plotDensityNormalizedExprsDiscovrExperiment()`, which outputs a plot of the pre- and post-normalization marker level distributions for each marker in each sample. It is recommended to check these distributions and modify the normalization method as needed so that distributions align well across samples - otherwise metaclusters may be identified that correspond to different cell populations in different samples.
+
+#### Choosing a normalization method for each marker
+
+The right method depends on the shape of a marker's distribution, and on whether differences between samples are technical or biological. The examples below use simulated B-cell data from 50 donors stained in 5 batches. Each curve is one donor, and three donors are highlighted in colour. In all panels, values are centered and scaled across all cells after normalization, which is a step `normalizeDiscovrExperiment()` always applies so that markers carry comparable weight in metaclustering.
+
+![Marker distributions for three example markers, before normalization and after normalization with the recommended method](man/figures/README-normalization-examples.png)
+
+**`zScore`: unimodal markers with sample-to-sample shifts in intensity** (example: CD19)
+Use this for markers expressed at a similar level on nearly all cells in the population, such as lineage markers (CD19 or CD20 on B cells, CD3 or CD8 on CD8 T cells). Differences between samples are mostly shifts and stretches of a single peak, which centering and scaling within each sample remove. Avoid z-scores for markers where the fraction of positive cells varies between samples: the mean and standard deviation then depend on the fraction of positive cells, and z-scoring moves the peaks by different amounts in different samples (see the comparison below).
+
+**`warpSet`: multimodal markers whose peaks drift between samples** (example: CD11c)
+Use this for markers with distinct negative and positive (or dim and bright) populations whose peak positions vary between samples or batches. warpSet (from `flowStats`) finds the peaks (landmarks) in each sample's distribution and warps the intensity scale so that matching peaks line up, without changing the proportion of cells in each peak. Use `warpSet#` (for example `warpSet2`) to set the maximum number of peaks to align. warpSet works best when every sample has every peak; if a population is absent from some samples, check the result carefully.
+
+**`none`: markers that are already aligned, or that normalization makes worse** (example: CD27)
+Use this when the peaks for a marker already line up across samples, so the differences between samples are biological rather than technical. In this example, the fraction of CD27+ memory B cells differs between donors. Z-scoring would shift the peaks to compensate for those real differences, introducing misalignment where there was none.
+
+`none` is also the best choice for difficult-to-normalize markers, where z-score and every version of warpSet leave the distributions less aligned than the raw data. This can happen with markers that have smeared or poorly separated peaks, or populations that are present in only some samples. Such markers can still be used for clustering, but inspect them carefully (for example with `plotDensityNormalizedExprsDiscovrExperiment()` and the metacluster heatmaps) to make sure they are adding information rather than sample-specific noise. `none` is also a reasonable choice for markers that are not used for clustering.
+
+<details>
+<summary><b>What happens with the wrong method?</b> Each example marker normalized with all three methods.</summary>
+
+![Each example marker normalized with z-score, warpSet, and no normalization, with the recommended method highlighted](man/figures/README-normalization-comparison.png)
+
+</details>
+
+To compare methods on your own data, run `testNormalizationMethodByMarker()` on a few markers, then check the distributions with `plotDensityNormalizedExprsDiscovrExperiment()`. Choose the method under which each marker's peaks line up across samples without erasing differences you expect to be real.
 
 Note that as with the setup and clustering functions, `normalizeDiscovrExperiment` will return a new `discovrExperiment` object that needs to be assigned to a variable.
 
@@ -191,19 +229,19 @@ After performing metaclustering, you can retrieve the event counts and fraction 
 getMetaclusterOccupancy(myExpt)
 
 ## Prints:
-#             subject    metacluster A2_CD8_T_Cells_frac A2_Er168+_EBV_frac A2_Tm169+_CMV_frac A2_Yb174+_Flu_frac A2_CD8_T_Cells_cts
-# 1  SubjXpb997364476  metacluster_1                0.01               0.00               0.00               0.00               1984
-# 2  SubjXpb997364476  metacluster_2                0.16               0.11               0.24               0.12              25815
-# 3  SubjXpb997364476  metacluster_3                0.15               0.14               0.19               0.15              23955
-# 4  SubjXpb997364476  metacluster_4                0.29               0.42               0.04               0.01              46547
-# 5  SubjXpb997364476  metacluster_5                0.05               0.08               0.08               0.01               8647
-# 6  SubjXpb997364476  metacluster_6                0.11               0.07               0.13               0.01              18105
-# 7  SubjXpb997364476  metacluster_7                0.01               0.00               0.16               0.44               1950
-# 8  SubjXpb997364476  metacluster_8                0.04               0.03               0.01               0.02               6746
-# 9  SubjXpb997364476  metacluster_9                0.07               0.04               0.03               0.02              11589
-# 10 SubjXpb997364476 metacluster_10                0.04               0.03               0.01               0.02               6430
-# 11 SubjXpb997364476 metacluster_11                0.05               0.06               0.10               0.20               7683
-# 12 SubjXpb997364476 metacluster_12                0.02               0.01               0.01               0.00               3720
+#                 subject    metacluster A2_CD8_T_Cells_frac A2_Er168+_EBV_frac A2_Tm169+_CMV_frac A2_Yb174+_Flu_frac A2_CD8_T_Cells_cts
+# 1  subject_123_sample_1  metacluster_1                0.01               0.00               0.00               0.00               1984
+# 2  subject_123_sample_1  metacluster_2                0.16               0.11               0.24               0.12              25815
+# 3  subject_123_sample_1  metacluster_3                0.15               0.14               0.19               0.15              23955
+# 4  subject_123_sample_1  metacluster_4                0.29               0.42               0.04               0.01              46547
+# 5  subject_123_sample_1  metacluster_5                0.05               0.08               0.08               0.01               8647
+# 6  subject_123_sample_1  metacluster_6                0.11               0.07               0.13               0.01              18105
+# 7  subject_123_sample_1  metacluster_7                0.01               0.00               0.16               0.44               1950
+# 8  subject_123_sample_1  metacluster_8                0.04               0.03               0.01               0.02               6746
+# 9  subject_123_sample_1  metacluster_9                0.07               0.04               0.03               0.02              11589
+# 10 subject_123_sample_1 metacluster_10                0.04               0.03               0.01               0.02               6430
+# 11 subject_123_sample_1 metacluster_11                0.05               0.06               0.10               0.20               7683
+# 12 subject_123_sample_1 metacluster_12                0.02               0.01               0.01               0.00               3720
 #    A2_Er168+_EBV_cts A2_Tm169+_CMV_cts A2_Yb174+_Flu_cts
 # 1                  2                 3                 0
 # 2                 53               530                88
@@ -225,21 +263,19 @@ These values are returned as a standard data frame, and can be saved or manipula
 metaxFreqValues = getMetaclusterOccupancy(myExpt)
 write.csv(
   metaxFreqValues, 
-  file = file.path("Users", "mrosasco", "discovrOutput", format(Sys.Date(), "%y%m%d-clusterOccupancy.csv"))
+  file = "metaclusterOccupancy.csv"
 )
 ```
 
 
 ### Heatmaps
 
-Once you've performed metaclustering, you can use the function `makeMetaclusterHeatmaps()` to produce and save heatmaps to summarize your data. By default this function assumes that the first subset listed in the `fcsInfoFile` used to initialize the experimnet is the parent population (eg: all CD8+s), and that all the remaining cell subsets are the rare/child populations. Details on explicitly assigning these populations for plotting are available in the docs at `?makeMetaclusterHeatmaps`. By default this function will save all heatmaps in the current working directory with the current date as the prefix, but this can be changed as in the example below.
+Once you've performed metaclustering, you can use the function `makeMetaclusterHeatmaps()` to produce and save heatmaps to summarize your data. By default this function assumes that the first subset listed in the `fcsInfoFile` used to initialize the experiment is the parent population (eg: all CD8+s), and that all the remaining cell subsets are the rare/child populations. Details on explicitly assigning these populations for plotting are available in the docs at `?makeMetaclusterHeatmaps`. By default this function will save all heatmaps in the current working directory with the current date as the prefix, but this can be changed as in the example below.
 
 ```R
 makeMetaclusterHeatmaps(
   myExpt,
-  filenamePrefix = file.path(
-    "Users", "mrosasco", "discovrOutput", format(Sys.Date(), "%y%m%d-")
-  )
+  filenamePrefix = "testData"
 )
 ```
 
@@ -280,21 +316,16 @@ BiocManager::install("flowCore")
 BiocManager::install("ComplexHeatmap")
 ```
 
-`flowStats` is installed from a Benaroya Research Institute fork rather than
-from Bioconductor:
+`flowStats` is installed from a Benaroya Research Institute fork rather than from Bioconductor:
 
 ```R
 devtools::install_github("BenaroyaResearch/flowStats", ref = "bri")
 ```
 
-The fork corrects a bug in `flowStats::warpSet` where the requested peak
-number was silently discarded, which made the "warpSet1", "warpSet2" and
-"warpSet3" normalization methods behave identically. Apart from that fix it
-is identical to the current Bioconductor release. Installing `flowStats`
-from Bioconductor instead will leave those methods indistinguishable.
+The fork corrects a bug in `flowStats::warpSet` where the requested peak number was silently discarded, which made the "warpSet1", "warpSet2" and "warpSet3" normalization methods behave identically. Apart from that fix it is identical to the current Bioconductor release. Installing `flowStats` from Bioconductor instead will leave those methods indistinguishable.
 
 The remaining dependencies should be automatically installed via CRAN, but if you encounter any issues you can manually install using the following code:
 
 ```R
-install.packages(pkgs=c("rlang", "igraph", "RANN", "Rcpp", "methods", "tidyverse", "reshape2", "RColorBrewer", "circlize", "viridisLite", "grid", "memuse", "umap")
+install.packages(pkgs=c("rlang", "igraph", "RANN", "Rcpp", "methods", "tidyverse", "reshape2", "RColorBrewer", "circlize", "viridisLite", "grid", "memuse", "umap"))
 ```
