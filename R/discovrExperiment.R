@@ -47,6 +47,16 @@ print.discovrExperiment <- function(x, ...){
       x$status
     )
   )
+  # clustering parameters are present only after clusterDiscovrExperiment();
+  # objects clustered with briDiscovr < 0.4.7 have clusterMethod but no k or seed
+  if(!is.null(x$clusterMethod)){
+    cat(sprintf(
+      "Clustering method: %s, k = %s, seed = %s\n",
+      x$clusterMethod,
+      if(is.null(x$phenographClusterK)) "not recorded" else x$phenographClusterK,
+      if(is.null(x$clusterSeed)) "not recorded" else x$clusterSeed
+    ))
+  }
   if(length(list(...)) > 0){
     warning("Additional arguments were passed to print.discovrExperiment and were ignored.")
   }

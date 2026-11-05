@@ -25,7 +25,12 @@ Currently only 'phenograph' is supported as a clustering method.}
 \item{verbose}{A boolean specifying whether to display processing messages (default: TRUE)}
 }
 \value{
-An S3 object of class \code{discovrExperiment}
+An S3 object of class \code{discovrExperiment}. The clustering
+parameters are stored in the elements \code{clusterMethod},
+\code{phenographClusterK} (the value of \code{k}) and \code{clusterSeed}
+(the value of \code{seed}). They are kept by downstream steps
+(normalization and metaclustering), so they can be retrieved later, e.g.
+\code{experiment$phenographClusterK}.
 }
 \description{
 Perform phenograph clustering for a DISCOV-R experiment

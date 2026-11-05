@@ -275,7 +275,12 @@ setupDiscovrExperiment <- function(
 #' @param k An integer specifying the maximum number of nearest neighbors to use. Applies only if method = 'phenograph' (default: 30)
 #' @param seed A number to be used as the seed for pseudorandom number generation (default: 12345)
 #' @param verbose A boolean specifying whether to display processing messages (default: TRUE)
-#' @return An S3 object of class \code{discovrExperiment}
+#' @return An S3 object of class \code{discovrExperiment}. The clustering
+#' parameters are stored in the elements \code{clusterMethod},
+#' \code{phenographClusterK} (the value of \code{k}) and \code{clusterSeed}
+#' (the value of \code{seed}). They are kept by downstream steps
+#' (normalization and metaclustering), so they can be retrieved later, e.g.
+#' \code{experiment$phenographClusterK}.
 #'
 #' @details With \code{method = "phenograph"}, events that share no nearest
 #' neighbors with any of their own k nearest neighbors have no edges in the
@@ -507,6 +512,8 @@ clusterDiscovrExperiment <- function(
   experiment$status                        <- "clustered"
   experiment$clusterMeans                  <- bind_rows(clusterMeans, parentMeans)
   experiment$clusterMethod                 <- method
+  experiment$phenographClusterK            <- k
+  experiment$clusterSeed                   <- seed
   experiment$clusterRarePopCts             <- clusterRarePopCts
 
   return(experiment)
