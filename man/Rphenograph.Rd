@@ -40,6 +40,14 @@ using the well known [Louvain method](https://sites.google.com/site/findcommunit
 Author: Chen Hao, 2015
 Copied from https://github.com/JinmiaoChenLab/Rphenograph/blob/master/R/phenograph.R
 for use in briDiscovr on 200611 under the Artistic-2.0 license
+
+Modified in briDiscovr 0.4.7: the graph now has one vertex per input row, in
+row order, so \code{membership()} always lines up with the rows of
+\code{data}. Rows that share no nearest neighbors with any of their own k
+nearest neighbors (and therefore have no edges in the graph) are assigned
+the most common cluster among their k nearest neighbors instead of forming
+one-row clusters. Previously, such rows could cause an error or silently
+misalign cluster labels with rows, mostly at small k.
 }
 \examples{
 \dontrun{

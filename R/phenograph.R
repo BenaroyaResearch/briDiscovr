@@ -11,6 +11,14 @@
 #' Copied from https://github.com/JinmiaoChenLab/Rphenograph/blob/master/R/phenograph.R
 #' for use in briDiscovr on 200611 under the Artistic-2.0 license
 #'
+#' Modified in briDiscovr 0.4.7: the graph now has one vertex per input row, in
+#' row order, so \code{membership()} always lines up with the rows of
+#' \code{data}. Rows that share no nearest neighbors with any of their own k
+#' nearest neighbors (and therefore have no edges in the graph) are assigned
+#' the most common cluster among their k nearest neighbors instead of forming
+#' one-row clusters. Previously, such rows could cause an error or silently
+#' misalign cluster labels with rows, mostly at small k.
+#'
 #' @param data matrix; input data matrix
 #' @param k integer; number of nearest neighbours (default:30)
 #'
@@ -45,7 +53,7 @@
 #'  ) +
 #'  geom_point(size = 3)+theme_bw()
 #' }
-#' @importFrom igraph graph.data.frame cluster_louvain modularity membership
+#' @importFrom igraph cluster_louvain modularity membership
 #' @useDynLib briDiscovr
 #'
 #' @export
@@ -69,25 +77,32 @@ Rphenograph <- function(data, k=30){
   cat("  Finding nearest neighbors...")
   t1 <- system.time(neighborMatrix <- find_neighbors(data, k=k+1)[,-1])
   cat("DONE ~",t1[3],"s\n", " Compute jaccard coefficient between nearest-neighbor sets...")
-  t2 <- system.time(links <- jaccard_coeff(neighborMatrix))
-
-  cat("DONE ~",t2[3],"s\n", " Build undirected graph from the weighted links...")
-  links <- links[links[,1]>0, ]
-  relations <- as.data.frame(links)
-  colnames(relations)<- c("from","to","weight")
-  t3 <- system.time(g <- graph.data.frame(relations, directed=FALSE))
+  # Builds the graph with one vertex per row, in row order (see buildPhenographGraph)
+  t2 <- system.time(g <- buildPhenographGraph(neighborMatrix))
 
   # Other community detection algorithms:
   #    cluster_walktrap, cluster_spinglass,
   #    cluster_leading_eigen, cluster_edge_betweenness,
   #    cluster_fast_greedy, cluster_label_prop
-  cat("DONE ~",t3[3],"s\n", " Run louvain clustering on the graph ...")
-  t4 <- system.time(community <- cluster_louvain(g))
-  cat("DONE ~",t4[3],"s\n")
+  cat("DONE ~",t2[3],"s\n", " Run louvain clustering on the graph ...")
+  t3 <- system.time(community <- cluster_louvain(g))
+  cat("DONE ~",t3[3],"s\n")
 
-  message("Run Rphenograph DONE, totally takes ", sum(c(t1[3],t2[3],t3[3],t4[3])), "s.")
+  # Give cells with no graph edges the majority cluster of their nearest neighbors.
+  # Only $membership is updated; modularity is unchanged by this reassignment.
+  isolatedResult <- assignIsolatedCells(as.integer(membership(community)), g, neighborMatrix)
+  community$membership <- isolatedResult$membership
+
+  message("Run Rphenograph DONE, totally takes ", sum(c(t1[3],t2[3],t3[3])), "s.")
   cat("  Return a community class\n  -Modularity value:", modularity(community),"\n")
-  cat("  -Number of clusters:", length(unique(membership(community))))
+  cat("  -Number of clusters:", length(unique(membership(community))), "\n")
+  if(isolatedResult$nIsolated > 0){
+    message(
+      "  -", isolatedResult$nIsolated, " of ", nrow(data), " rows shared no ",
+      "nearest neighbors with any of their own nearest neighbors; they were ",
+      "assigned to the most common cluster among their ", k, " nearest neighbors."
+    )
+  }
 
   return(list(g, community))
 }

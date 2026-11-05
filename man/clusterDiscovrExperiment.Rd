@@ -30,6 +30,15 @@ An S3 object of class \code{discovrExperiment}
 \description{
 Perform phenograph clustering for a DISCOV-R experiment
 }
+\details{
+With \code{method = "phenograph"}, events that share no nearest
+neighbors with any of their own k nearest neighbors have no edges in the
+PhenoGraph graph. Rather than forming one-event clusters, each such event is
+assigned the most common cluster among its k nearest neighbors, and a
+message reports how many events this affected in each sample. This mostly
+happens at small k. Versions of briDiscovr before 0.4.7 could stop with an
+error or silently assign cluster labels to the wrong events in this case.
+}
 \seealso{
 \code{\link{setupDiscovrExperiment}} \code{\link{discovrExperiment}}
 }

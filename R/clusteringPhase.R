@@ -277,6 +277,14 @@ setupDiscovrExperiment <- function(
 #' @param verbose A boolean specifying whether to display processing messages (default: TRUE)
 #' @return An S3 object of class \code{discovrExperiment}
 #'
+#' @details With \code{method = "phenograph"}, events that share no nearest
+#' neighbors with any of their own k nearest neighbors have no edges in the
+#' PhenoGraph graph. Rather than forming one-event clusters, each such event is
+#' assigned the most common cluster among its k nearest neighbors, and a
+#' message reports how many events this affected in each sample. This mostly
+#' happens at small k. Versions of briDiscovr before 0.4.7 could stop with an
+#' error or silently assign cluster labels to the wrong events in this case.
+#'
 #' @seealso \code{\link{setupDiscovrExperiment}} \code{\link{discovrExperiment}}
 #' @author Mario G Rosasco, Virginia Muir
 #' @import dplyr
@@ -354,39 +362,41 @@ clusterDiscovrExperiment <- function(
         "Compute jaccard coefficient between nearest-neighbor sets..."
       )
     }
-    t2 <- system.time(links <- jaccard_coeff(neighborMatrix))
+    # computes Jaccard coefficients and builds the graph with one vertex per row, in row order
+    t2 <- system.time(g <- buildPhenographGraph(neighborMatrix))
 
     if(verbose){
       message(
         "DONE ~", round(t2[3], nDigits), "s\n",
-        "Build undirected graph from the weighted links..."
-      )
-    }
-
-    links <- links[links[,1]>0, ]
-    relations <- as.data.frame(links)
-    colnames(relations)<- c("from","to","weight")
-    t3 <- system.time(g <- igraph::graph_from_data_frame(relations, directed=FALSE))
-
-    if(verbose){
-      message(
-        "DONE ~", round(t3[3], nDigits), "s\n",
         "Run louvain clustering on the graph ..."
       )
     }
 
-    t4 <- system.time(community <- igraph::cluster_louvain(g))
+    t3 <- system.time(community <- igraph::cluster_louvain(g))
     if(verbose){
-      message("DONE ~", round(t4[3], nDigits), "s\n")
+      message("DONE ~", round(t3[3], nDigits), "s\n")
     }
 
-    if(verbose){
-      message("Run Rphenograph DONE, took a total of ", round(sum(c(t1[3],t2[3],t3[3],t4[3])), nDigits), "s.")
-      message("  Return a community class\n  -Modularity value: ", igraph::modularity(community),"\n")
-      message("  -Number of clusters: ", length(unique(igraph::membership(community))))
+    # give cells with no graph edges the majority cluster of their nearest neighbors
+    isolatedResult <- assignIsolatedCells(
+      as.integer(igraph::membership(community)), g, neighborMatrix
+    )
+    clusterLabels <- isolatedResult$membership
 
+    if(verbose){
+      message("Run Rphenograph DONE, took a total of ", round(sum(c(t1[3],t2[3],t3[3])), nDigits), "s.")
+      message("  -Modularity value: ", igraph::modularity(community),"\n")
+      message("  -Number of clusters: ", length(unique(clusterLabels)))
     }
-    return(community)
+    if(isolatedResult$nIsolated > 0){
+      message(
+        "  -", isolatedResult$nIsolated, " of ", nrow(data), " events shared no ",
+        "nearest neighbors with any of their own nearest neighbors; they were ",
+        "assigned to the most common cluster among their ", k, " nearest neighbors. ",
+        "Consider increasing k if this number is large."
+      )
+    }
+    return(clusterLabels)
   }
 
   # Cluster data in experiment
@@ -401,13 +411,13 @@ clusterDiscovrExperiment <- function(
       if(verbose){
         message("\nClustering sample ", match(currSubj, allSubjects), " of ", length(allSubjects), "...")
       }
-      rPhenoVect <- as.numeric(igraph::membership(runRpheno(
+      rPhenoVect <- as.numeric(runRpheno(
         data = experiment$mergedExpr[
           experiment$mergedExpr$samp == currSubj,
           experiment$clusteringMarkers
         ],
         k = k
-      )))
+      ))
       # add cluster IDs
       experiment$mergedExpr[experiment$mergedExpr$samp == currSubj, "RPclust"] <- rPhenoVect
     }
