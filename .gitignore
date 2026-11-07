@@ -2,3 +2,6 @@
 src/*.o
 src/*.so
 src/*.dll
+
+# Default graphics device output from running tests
+Rplots.pdf
