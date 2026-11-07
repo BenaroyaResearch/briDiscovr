@@ -106,7 +106,7 @@ makeMetaclusterHeatmaps <- function(
 
   parentSubset <- experiment$parentPopulation
 
-  if(is.na(childSubsets)){
+  if(isUnsetArgument(childSubsets)){
     childSubsets <- subsets[subsets != parentSubset]
     message(
       "No child populations specified. Assuming child populations are: ",
@@ -133,7 +133,7 @@ makeMetaclusterHeatmaps <- function(
   ComplexHeatmap::ht_opt(message = FALSE)
   
   # Set up the file name prefix
-  if(is.na(filenamePrefix)){
+  if(isUnsetArgument(filenamePrefix)){
     filenamePrefix <- format(Sys.Date(), "%y%m%d-")
   }
   filenamePrefix = paste0(

@@ -1,8 +1,8 @@
 # Build a small discovrExperiment from synthetic FCS files written to a temporary
 # directory. Each subject has a parent population (three well-separated
-# phenotypes) and a rare subset that is a subset of the parent cells.
+# phenotypes) and one or more rare subsets, each a random subset of the parent cells.
 makeSyntheticExperiment <- function(nSubjects = 3, nCellsPerSubject = 600, nRareCells = 60,
-                                    nMarkers = 6, seed = 1){
+                                    nMarkers = 6, seed = 1, rareSubsetNames = "rare"){
   set.seed(seed)
   fcsDir <- tempfile("syntheticFcs")
   dir.create(fcsDir)
@@ -29,15 +29,18 @@ makeSyntheticExperiment <- function(nSubjects = 3, nCellsPerSubject = 600, nRare
     phenotype <- sample(1:3, nCellsPerSubject, replace = TRUE)
     parentValues <- phenotypeMeans[phenotype] +
       matrix(rnorm(nCellsPerSubject * nMarkers, sd = 0.5), ncol = nMarkers)
-    rareValues <- parentValues[sample(nCellsPerSubject, nRareCells), , drop = FALSE]
-
     parentPath <- file.path(fcsDir, paste0(subject, "_parent.fcs"))
-    rarePath <- file.path(fcsDir, paste0(subject, "_rare.fcs"))
     writeFcs(parentValues, parentPath)
-    writeFcs(rareValues, rarePath)
+    rarePaths <- character(0)
+    for(rareSubsetName in rareSubsetNames){
+      rareValues <- parentValues[sample(nCellsPerSubject, nRareCells), , drop = FALSE]
+      rarePath <- file.path(fcsDir, paste0(subject, "_", rareSubsetName, ".fcs"))
+      writeFcs(rareValues, rarePath)
+      rarePaths <- c(rarePaths, rarePath)
+    }
     fcsInfo <- rbind(
       fcsInfo,
-      data.frame(subject = subject, cellSubset = c("parent", "rare"), filename = c(parentPath, rarePath))
+      data.frame(subject = subject, cellSubset = c("parent", rareSubsetNames), filename = c(parentPath, rarePaths))
     )
   }
 
