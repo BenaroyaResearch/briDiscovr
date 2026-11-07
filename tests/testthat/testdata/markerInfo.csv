@@ -1,0 +1,15 @@
+"fixed","desc","useToCluster","normalizationMethod"
+"FSC.A","FSC-A",FALSE,
+"FSC.H","FSC-H",FALSE,
+"CD20","CD20",TRUE,"zScore"
+"FCRL5","FCRL5",TRUE,"warpSet"
+"CD38","CD38",TRUE,"warpSet"
+"CD86","CD86",TRUE,"warpSet"
+"CD95","CD95",TRUE,"warpSet"
+"IgD","IgD",TRUE,"warpSet3"
+"CD19","CD19",TRUE,"zScore"
+"IgM","IgM",TRUE,"none"
+"CD3","CD3",FALSE,"warpSet"
+"CD14","CD14",FALSE,"warpSet"
+"CD138","CD138",TRUE,"warpSet"
+"CD27","CD27",TRUE,"none"

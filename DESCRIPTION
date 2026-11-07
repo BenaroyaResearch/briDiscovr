@@ -47,5 +47,6 @@ Imports:
 Remotes:
     BenaroyaResearch/flowStats@bri
 Suggests:
-    testthat,
+    testthat (>= 3.1.7),
     withr
+Config/testthat/edition: 3
