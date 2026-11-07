@@ -217,16 +217,16 @@ getEventIntensities <- function(experiment, cellSubsets = NA, metaclusters = NA,
   }
 
   # If arguments are left as NA assign to all values
-  if(is.na(cellSubsets)){
+  if(isUnsetArgument(cellSubsets)){
     cellSubsets <- unique(experiment$mergedExpr$cellSubset)
   }
-  if(is.na(subjects)){
+  if(isUnsetArgument(subjects)){
     subjects <- unique(experiment$mergedExpr$samp)
   }
-  if(is.na(markers)){
+  if(isUnsetArgument(markers)){
     markers <- unique(experiment$markerInfo$commonMarkerName)
   }
-  if(is.na(metaclusters)){
+  if(isUnsetArgument(metaclusters)){
     metaclusters <- 1:experiment$nMetaclusters
   }
 
@@ -326,16 +326,16 @@ getEventZScores <- function(experiment, cellSubsets = NA, metaclusters = NA, sub
   }
 
   # If arguments are left as NA assign to all values
-  if(is.na(cellSubsets)){
+  if(isUnsetArgument(cellSubsets)){
     cellSubsets <- unique(experiment$mergedExpr$cellSubset)
   }
-  if(is.na(subjects)){
+  if(isUnsetArgument(subjects)){
     subjects <- unique(experiment$mergedExpr$samp)
   }
-  if(is.na(markers)){
+  if(isUnsetArgument(markers)){
     markers <- unique(experiment$markerInfo$commonMarkerName)
   }
-  if(is.na(metaclusters)){
+  if(isUnsetArgument(metaclusters)){
     metaclusters <- 1:experiment$nMetaclusters
   }
 

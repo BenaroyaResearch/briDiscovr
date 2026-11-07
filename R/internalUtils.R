@@ -55,6 +55,13 @@ processFcsList <- function(fcs, markerInfo){
   return(fcs)
 }
 
+# Private function to check whether an optional argument was left at its default of NA,
+# meaning "use all values". Unlike `is.na(x)`, this returns a single TRUE/FALSE when x
+# contains more than one value, so it is safe to use in `if()` statements.
+isUnsetArgument <- function(x){
+  length(x) == 1 && is.na(x)
+}
+
 # Private function to generate a list of colors of arbitrary length.
 getColorList <- function(n, seed = 42){
   set.seed(seed)
