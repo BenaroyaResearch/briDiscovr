@@ -1,0 +1,4 @@
+# Compiled C++ objects and shared libraries; R builds these during installation
+src/*.o
+src/*.so
+src/*.dll
