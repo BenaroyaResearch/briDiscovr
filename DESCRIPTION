@@ -1,7 +1,7 @@
 Package: briDiscovr
 Type: Package
 Title: Distribution analysis across clusters of a parent population overlaid with a rare subpopulation
-Version: 0.4.6
+Version: 0.4.7
 Authors@R: c(
   person("Mario", "Rosasco", role = c("aut")),
   person("Virginia", "Muir", role = c("aut")),
@@ -18,9 +18,13 @@ RoxygenNote: 7.3.3
 LinkingTo: 
     Rcpp
 biocViews:
+Depends:
+    R (>= 4.1.0)
 Imports: 
     rlang,
-    igraph(>= 1.0.1),
+    igraph (>= 1.2.7),
+    BiocNeighbors (>= 2.0.0),
+    parallel,
     RANN(>= 2.5),
     Rcpp (>= 0.12.0),
     methods,
