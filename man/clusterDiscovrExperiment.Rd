@@ -2,51 +2,98 @@
 % Please edit documentation in R/clusteringPhase.R
 \name{clusterDiscovrExperiment}
 \alias{clusterDiscovrExperiment}
-\title{Perform phenograph clustering for a DISCOV-R experiment}
+\title{Cluster the events of each sample in a DISCOV-R experiment}
 \usage{
 clusterDiscovrExperiment(
   experiment,
-  method = "phenograph",
+  method = c("phenograph", "leiden"),
   k = 30,
   seed = 12345,
+  setSeedOncePer = c("sample", "run"),
+  nThreads = max(1L, parallel::detectCores() - 1L, na.rm = TRUE),
+  leidenResolution = 1,
+  leidenIterations = -1,
   verbose = TRUE
 )
 }
 \arguments{
 \item{experiment}{A discovrExperiment created using \code{setupDiscovrExperiment()}}
 
-\item{method}{A character string indicating the clustering method to use.
-Currently only 'phenograph' is supported as a clustering method.}
+\item{method}{A character string indicating the community detection method:
+\code{"phenograph"} (Louvain algorithm; default) or \code{"leiden"} (Leiden
+algorithm). Leiden guarantees that each cluster is internally connected, but
+gives somewhat different clusters. Run until convergence (the default), it
+takes about as long as Louvain; with \code{leidenIterations = 2} it is faster.}
 
-\item{k}{An integer specifying the maximum number of nearest neighbors to use. Applies only if method = 'phenograph' (default: 30)}
+\item{k}{An integer specifying the number of nearest neighbors used to build the graph (default: 30)}
 
 \item{seed}{A number to be used as the seed for pseudorandom number generation (default: 12345)}
+
+\item{setSeedOncePer}{Either \code{"sample"} (default) or \code{"run"}. With
+\code{"sample"}, the seed is set before clustering each sample, so each
+sample's clusters depend only on its own events and the seed. With
+\code{"run"}, the seed is set once before clustering all samples, as in
+briDiscovr 0.4.6 and earlier; each sample's clusters then also depend on which
+samples were clustered before it, so adding, removing or reordering samples
+can change them.}
+
+\item{nThreads}{An integer specifying the number of threads used for the
+nearest-neighbor search (default: number of cores minus one). The search is
+exact, so this does not change the results.}
+
+\item{leidenResolution}{A number specifying the resolution parameter for the
+Leiden algorithm; higher values give more, smaller clusters. Applies only if
+\code{method = "leiden"} (default: 1)}
+
+\item{leidenIterations}{An integer specifying the number of iterations of the
+Leiden algorithm; a negative value runs until the clusters stop changing.
+Applies only if \code{method = "leiden"} (default: -1)}
 
 \item{verbose}{A boolean specifying whether to display processing messages (default: TRUE)}
 }
 \value{
 An S3 object of class \code{discovrExperiment}. The clustering
 parameters are stored in the elements \code{clusterMethod},
-\code{phenographClusterK} (the value of \code{k}) and \code{clusterSeed}
-(the value of \code{seed}). They are kept by downstream steps
+\code{phenographClusterK} (the value of \code{k}), \code{clusterSeed}
+(the value of \code{seed}) and \code{clusterSetSeedOncePer}; with
+\code{method = "leiden"}, also \code{leidenResolution} and
+\code{leidenIterations}. They are kept by downstream steps
 (normalization and metaclustering), so they can be retrieved later, e.g.
 \code{experiment$phenographClusterK}.
 }
 \description{
-Perform phenograph clustering for a DISCOV-R experiment
+Events from each sample are clustered separately. Both methods build the
+PhenoGraph shared-nearest-neighbor graph: each event is linked to its \code{k}
+nearest neighbors (exact Euclidean search on the clustering markers), and each
+link is weighted by the Jaccard coefficient of the two events' neighbor sets.
+Communities in that graph are then found with either the Louvain algorithm
+(\code{method = "phenograph"}, as in the original PhenoGraph) or the Leiden
+algorithm (\code{method = "leiden"}), both optimizing modularity.
 }
 \details{
-With \code{method = "phenograph"}, events that share no nearest
-neighbors with any of their own k nearest neighbors have no edges in the
-PhenoGraph graph. Rather than forming one-event clusters, each such event is
-assigned the most common cluster among its k nearest neighbors, and a
-message reports how many events this affected in each sample. This mostly
-happens at small k. Versions of briDiscovr before 0.4.7 could stop with an
-error or silently assign cluster labels to the wrong events in this case.
+Results are deterministic: with the same input data and the same
+values of \code{method}, \code{k}, \code{seed}, \code{setSeedOncePer} and
+the Leiden settings, repeated runs give identical clusters, whatever the
+value of \code{nThreads}. Results can differ between versions of the igraph
+package, so record the igraph version with your results.
+
+Events that share no nearest neighbors with any of their own k nearest
+neighbors have no edges in the PhenoGraph graph. Rather than forming
+one-event clusters, each such event is assigned the most common cluster
+among its k nearest neighbors, and a message reports how many events this
+affected in each sample. This mostly happens at small k. Versions of
+briDiscovr before 0.4.7 could stop with an error or silently assign cluster
+labels to the wrong events in this case.
+
+Changes in briDiscovr 0.4.7 that affect results: the seed is now set for each
+sample by default (use \code{setSeedOncePer = "run"} for the earlier
+behavior); nearest neighbors are found with the BiocNeighbors package instead
+of RANN, which gives the same neighbors except possibly in the order of
+exactly tied distances.
 }
 \seealso{
 \code{\link{setupDiscovrExperiment}} \code{\link{discovrExperiment}}
 }
 \author{
-Mario G Rosasco, Virginia Muir
+Mario G Rosasco, Virginia Muir, Matt Dufort
 }

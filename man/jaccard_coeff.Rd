@@ -7,7 +7,7 @@
 jaccard_coeff(idx)
 }
 \arguments{
-\item{idx}{NumericMatrix}
+\item{idx}{NumericMatrix of 1-based neighbor indices (one row per event, self excluded)}
 }
 \value{
 NumericMatrix
@@ -20,7 +20,11 @@ In this way, the undirected graph is symmetrized by halfing the weight
 in code `weights(r, 2) = u/(2.0*ncol - u)/2`.
 }
 \details{
+Rows of the returned matrix beyond the last recorded link are left as zeros.
+
 Author: Chen Hao, Date: 25/09/2015
 Copied from https://github.com/JinmiaoChenLab/Rphenograph/blob/master/src/jaccard_coeff.cpp
-for use in briDiscovr on 200611 under the Artistic-2.0 license
+for use in briDiscovr on 200611 under the Artistic-2.0 license.
+Rewritten in briDiscovr to count intersections with a marker array instead of
+Rcpp::intersect(); output (values and row order) is unchanged.
 }

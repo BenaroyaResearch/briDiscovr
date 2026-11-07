@@ -26,5 +26,12 @@ share no neighbors with any of their own neighbors and have no edge of their
 own; such cells are then either moved out of row order (silently misaligning
 cluster labels for all subsequent rows) or dropped from the graph entirely
 (causing a row-count error). Declaring vertices prevents both.
+
+\code{jaccard_coeff()} records a pair of cells once from each cell's
+neighbor list, each time with half the Jaccard coefficient. These two
+half-weight edges are merged into one edge carrying the full weight. The
+merged graph has the same weighted connections, and therefore the same
+modularity for any partition, but has fewer edges, so clustering is faster.
+Self-loops (possible when cells are duplicated) are kept, as before.
 }
 \keyword{internal}

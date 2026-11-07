@@ -11,11 +11,18 @@
 #' cluster labels for all subsequent rows) or dropped from the graph entirely
 #' (causing a row-count error). Declaring vertices prevents both.
 #'
+#' \code{jaccard_coeff()} records a pair of cells once from each cell's
+#' neighbor list, each time with half the Jaccard coefficient. These two
+#' half-weight edges are merged into one edge carrying the full weight. The
+#' merged graph has the same weighted connections, and therefore the same
+#' modularity for any partition, but has fewer edges, so clustering is faster.
+#' Self-loops (possible when cells are duplicated) are kept, as before.
+#'
 #' @param neighborMatrix An integer matrix with one row per cell, giving the
 #' row indices of each cell's k nearest neighbors (excluding the cell itself)
 #' @return An igraph graph with \code{nrow(neighborMatrix)} vertices named
 #' \code{1..nrow(neighborMatrix)} in row order
-#' @importFrom igraph graph_from_data_frame vcount V
+#' @importFrom igraph make_graph simplify vcount V E
 #' @keywords internal
 buildPhenographGraph <- function(neighborMatrix){
   nCells <- nrow(neighborMatrix)
@@ -23,13 +30,20 @@ buildPhenographGraph <- function(neighborMatrix){
   links <- jaccard_coeff(neighborMatrix)
   # keep only rows that were filled in (cell pairs that share at least one neighbor)
   links <- links[links[, 1] > 0, , drop = FALSE]
-  relations <- as.data.frame(links)
-  colnames(relations) <- c("from", "to", "weight")
 
-  g <- igraph::graph_from_data_frame(
-    relations,
-    directed = FALSE,
-    vertices = data.frame(name = seq_len(nCells))
+  # build from integer vertex IDs; setting n declares every cell as a vertex,
+  # including cells with no edges, so vertex i is cell i
+  edgeList <- as.vector(t(links[, 1:2]))
+  g <- igraph::make_graph(edgeList, n = nCells, directed = FALSE)
+  igraph::E(g)$weight <- links[, 3]
+  igraph::V(g)$name <- as.character(seq_len(nCells))
+
+  # merge the two half-weight edges recorded for each pair into one full-weight edge
+  g <- igraph::simplify(
+    g,
+    remove.multiple = TRUE,
+    remove.loops = FALSE,
+    edge.attr.comb = list(weight = "sum")
   )
 
   # confirm that vertex i is cell i; cluster labels are matched to cells by position

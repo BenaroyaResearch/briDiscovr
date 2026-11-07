@@ -267,40 +267,85 @@ setupDiscovrExperiment <- function(
   return(experiment)
 }
 
-#' Perform phenograph clustering for a DISCOV-R experiment
+#' Cluster the events of each sample in a DISCOV-R experiment
+#'
+#' Events from each sample are clustered separately. Both methods build the
+#' PhenoGraph shared-nearest-neighbor graph: each event is linked to its \code{k}
+#' nearest neighbors (exact Euclidean search on the clustering markers), and each
+#' link is weighted by the Jaccard coefficient of the two events' neighbor sets.
+#' Communities in that graph are then found with either the Louvain algorithm
+#' (\code{method = "phenograph"}, as in the original PhenoGraph) or the Leiden
+#' algorithm (\code{method = "leiden"}), both optimizing modularity.
 #'
 #' @param experiment A discovrExperiment created using \code{setupDiscovrExperiment()}
-#' @param method A character string indicating the clustering method to use.
-#' Currently only 'phenograph' is supported as a clustering method.
-#' @param k An integer specifying the maximum number of nearest neighbors to use. Applies only if method = 'phenograph' (default: 30)
+#' @param method A character string indicating the community detection method:
+#' \code{"phenograph"} (Louvain algorithm; default) or \code{"leiden"} (Leiden
+#' algorithm). Leiden guarantees that each cluster is internally connected, but
+#' gives somewhat different clusters. Run until convergence (the default), it
+#' takes about as long as Louvain; with \code{leidenIterations = 2} it is faster.
+#' @param k An integer specifying the number of nearest neighbors used to build the graph (default: 30)
 #' @param seed A number to be used as the seed for pseudorandom number generation (default: 12345)
+#' @param setSeedOncePer Either \code{"sample"} (default) or \code{"run"}. With
+#' \code{"sample"}, the seed is set before clustering each sample, so each
+#' sample's clusters depend only on its own events and the seed. With
+#' \code{"run"}, the seed is set once before clustering all samples, as in
+#' briDiscovr 0.4.6 and earlier; each sample's clusters then also depend on which
+#' samples were clustered before it, so adding, removing or reordering samples
+#' can change them.
+#' @param nThreads An integer specifying the number of threads used for the
+#' nearest-neighbor search (default: number of cores minus one). The search is
+#' exact, so this does not change the results.
+#' @param leidenResolution A number specifying the resolution parameter for the
+#' Leiden algorithm; higher values give more, smaller clusters. Applies only if
+#' \code{method = "leiden"} (default: 1)
+#' @param leidenIterations An integer specifying the number of iterations of the
+#' Leiden algorithm; a negative value runs until the clusters stop changing.
+#' Applies only if \code{method = "leiden"} (default: -1)
 #' @param verbose A boolean specifying whether to display processing messages (default: TRUE)
 #' @return An S3 object of class \code{discovrExperiment}. The clustering
 #' parameters are stored in the elements \code{clusterMethod},
-#' \code{phenographClusterK} (the value of \code{k}) and \code{clusterSeed}
-#' (the value of \code{seed}). They are kept by downstream steps
+#' \code{phenographClusterK} (the value of \code{k}), \code{clusterSeed}
+#' (the value of \code{seed}) and \code{clusterSetSeedOncePer}; with
+#' \code{method = "leiden"}, also \code{leidenResolution} and
+#' \code{leidenIterations}. They are kept by downstream steps
 #' (normalization and metaclustering), so they can be retrieved later, e.g.
 #' \code{experiment$phenographClusterK}.
 #'
-#' @details With \code{method = "phenograph"}, events that share no nearest
-#' neighbors with any of their own k nearest neighbors have no edges in the
-#' PhenoGraph graph. Rather than forming one-event clusters, each such event is
-#' assigned the most common cluster among its k nearest neighbors, and a
-#' message reports how many events this affected in each sample. This mostly
-#' happens at small k. Versions of briDiscovr before 0.4.7 could stop with an
-#' error or silently assign cluster labels to the wrong events in this case.
+#' @details Results are deterministic: with the same input data and the same
+#' values of \code{method}, \code{k}, \code{seed}, \code{setSeedOncePer} and
+#' the Leiden settings, repeated runs give identical clusters, whatever the
+#' value of \code{nThreads}. Results can differ between versions of the igraph
+#' package, so record the igraph version with your results.
+#'
+#' Events that share no nearest neighbors with any of their own k nearest
+#' neighbors have no edges in the PhenoGraph graph. Rather than forming
+#' one-event clusters, each such event is assigned the most common cluster
+#' among its k nearest neighbors, and a message reports how many events this
+#' affected in each sample. This mostly happens at small k. Versions of
+#' briDiscovr before 0.4.7 could stop with an error or silently assign cluster
+#' labels to the wrong events in this case.
+#'
+#' Changes in briDiscovr 0.4.7 that affect results: the seed is now set for each
+#' sample by default (use \code{setSeedOncePer = "run"} for the earlier
+#' behavior); nearest neighbors are found with the BiocNeighbors package instead
+#' of RANN, which gives the same neighbors except possibly in the order of
+#' exactly tied distances.
 #'
 #' @seealso \code{\link{setupDiscovrExperiment}} \code{\link{discovrExperiment}}
-#' @author Mario G Rosasco, Virginia Muir
+#' @author Mario G Rosasco, Virginia Muir, Matt Dufort
 #' @import dplyr
 #' @importFrom flowCore exprs
-#' @importFrom igraph graph_from_data_frame cluster_louvain membership modularity
+#' @importFrom igraph cluster_louvain cluster_leiden membership modularity
 #' @export
 clusterDiscovrExperiment <- function(
   experiment,
-  method = "phenograph",
+  method = c("phenograph", "leiden"),
   k = 30,
   seed = 12345,
+  setSeedOncePer = c("sample", "run"),
+  nThreads = max(1L, parallel::detectCores() - 1L, na.rm = TRUE),
+  leidenResolution = 1,
+  leidenIterations = -1,
   verbose = TRUE
 ){
   if(!is.discovrExperiment(experiment)){
@@ -309,132 +354,62 @@ clusterDiscovrExperiment <- function(
       "Please create your experiment using the 'setupDiscovrExperiment' function and try again."
     )
   }
-  
-  # check for subjects with too few events to cluster
-  if(method == "phenograph"){
-    if(verbose){message("Checking for subjects with too few events to cluster...")}
-    subjectCounts <- getSubjectCounts(experiment)
-    if(any(subjectCounts$nEvents < k + 2)){
-      stop(
-        "PhenoGraph clustering can only proceed with subjects that have at ",
-        "least k + 2 (", k + 2, ") total events. Please check or remove the ",
-        "following subjects, or modify the clustering parameters, ",
-        "and try again:\n",
-        paste(subjectCounts$sample[subjectCounts$nEvents < k + 2], collapse = ", ")
-      )
-    }
+  method <- match.arg(method)
+  setSeedOncePer <- match.arg(setSeedOncePer)
+  if(k < 1){
+    stop("k must be a positive integer!")
   }
 
-  set.seed(seed)
+  # check for subjects with too few events to cluster
+  if(verbose){message("Checking for subjects with too few events to cluster...")}
+  subjectCounts <- getSubjectCounts(experiment)
+  if(any(subjectCounts$nEvents < k + 2)){
+    stop(
+      "Clustering can only proceed with subjects that have at ",
+      "least k + 2 (", k + 2, ") total events. Please check or remove the ",
+      "following subjects, or modify the clustering parameters, ",
+      "and try again:\n",
+      paste(subjectCounts$sample[subjectCounts$nEvents < k + 2], collapse = ", ")
+    )
+  }
+
+  if(setSeedOncePer == "run"){
+    set.seed(seed)
+  }
 
   #########################################################################
   # Section 2.d.i from original SOP - Phenograph clustering - takes a while
   #########################################################################
   # Clustering markers object is defined in the first set-up chunk.  Tweak which markers are included up there.
+  # The steps for one sample are in clusterEvents() (R/clusteringInternals.R).
 
-  # Set up Phenograph function to use kd tree
-  findNeighbors <- function(data, k){
-    nearest <- RANN::nn2(data, data, k, treetype = "kd", searchtype = "standard")
-    return(nearest[[1]])
-  }
-
-  runRpheno <- function(data, k = 30){
-    nDigits <- 3 # set number of digits for time display
-    if(is.data.frame(data))
-      data <- as.matrix(data)
-
-    if(!is.matrix(data))
-      stop("Wrong input data, should be a data frame or matrix!")
-
-    if(k<1){
-      stop("k must be a positive integer!")
-    }else if (nrow(data) < k + 2){
-      stop("k must be smaller than the total number of points!")
-    }
-
+  # initialize RPclust
+  experiment$mergedExpr$RPclust <- NA
+  # cluster events within each subject
+  allSubjects <- unique(experiment$mergedExpr$samp)
+  for(currSubj in allSubjects){
     if(verbose){
-      message("Run Rphenograph starts:","\n",
-              "  -Input data of ", nrow(data)," rows and ", ncol(data), " columns","\n",
-              "  -k is set to ", k)
-      message("  Finding nearest neighbors...")
+      message("\nClustering sample ", match(currSubj, allSubjects), " of ", length(allSubjects), "...")
     }
-
-    t1 <- system.time(neighborMatrix <- findNeighbors(data, k=k+1)[,-1])
-
-    if(verbose){
-      message(
-        "DONE ~", round(t1[3], nDigits), "s\n",
-        "Compute jaccard coefficient between nearest-neighbor sets..."
-      )
+    if(setSeedOncePer == "sample"){
+      set.seed(seed)
     }
-    # computes Jaccard coefficients and builds the graph with one vertex per row, in row order
-    t2 <- system.time(g <- buildPhenographGraph(neighborMatrix))
-
-    if(verbose){
-      message(
-        "DONE ~", round(t2[3], nDigits), "s\n",
-        "Run louvain clustering on the graph ..."
-      )
-    }
-
-    t3 <- system.time(community <- igraph::cluster_louvain(g))
-    if(verbose){
-      message("DONE ~", round(t3[3], nDigits), "s\n")
-    }
-
-    # give cells with no graph edges the majority cluster of their nearest neighbors
-    isolatedResult <- assignIsolatedCells(
-      as.integer(igraph::membership(community)), g, neighborMatrix
+    isCurrSubj <- experiment$mergedExpr$samp == currSubj
+    clusterLabels <- clusterEvents(
+      data = experiment$mergedExpr[isCurrSubj, experiment$clusteringMarkers],
+      method = method,
+      k = k,
+      nThreads = nThreads,
+      leidenResolution = leidenResolution,
+      leidenIterations = leidenIterations,
+      verbose = verbose
     )
-    clusterLabels <- isolatedResult$membership
-
-    if(verbose){
-      message("Run Rphenograph DONE, took a total of ", round(sum(c(t1[3],t2[3],t3[3])), nDigits), "s.")
-      message("  -Modularity value: ", igraph::modularity(community),"\n")
-      message("  -Number of clusters: ", length(unique(clusterLabels)))
-    }
-    if(isolatedResult$nIsolated > 0){
-      message(
-        "  -", isolatedResult$nIsolated, " of ", nrow(data), " events shared no ",
-        "nearest neighbors with any of their own nearest neighbors; they were ",
-        "assigned to the most common cluster among their ", k, " nearest neighbors. ",
-        "Consider increasing k if this number is large."
-      )
-    }
-    return(clusterLabels)
+    # add cluster IDs
+    experiment$mergedExpr[isCurrSubj, "RPclust"] <- as.numeric(clusterLabels)
   }
-
-  # Cluster data in experiment
-  if (method == "phenograph") {
-    # initialize RPclust
-    experiment$mergedExpr$RPclust <- NA
-    # assign row IDs for merge
-    experiment$mergedExpr$rowIdx <- seq_len(nrow(experiment$mergedExpr))
-    # cluster events within each subject
-    allSubjects <- unique(experiment$mergedExpr$samp)
-    for(currSubj in allSubjects){
-      if(verbose){
-        message("\nClustering sample ", match(currSubj, allSubjects), " of ", length(allSubjects), "...")
-      }
-      rPhenoVect <- as.numeric(runRpheno(
-        data = experiment$mergedExpr[
-          experiment$mergedExpr$samp == currSubj,
-          experiment$clusteringMarkers
-        ],
-        k = k
-      ))
-      # add cluster IDs
-      experiment$mergedExpr[experiment$mergedExpr$samp == currSubj, "RPclust"] <- rPhenoVect
-    }
-    # remove row IDs so they don't interfere downstream
-    experiment$mergedExpr <- subset(experiment$mergedExpr, select = -get("rowIdx"))
-    # check to make sure that all events were assigned
-    if(any(is.na(experiment$mergedExpr$RPclust))){
-      stop("Not all events were assigned to a cluster. Please contact the package developer for assistance.")
-    }
-
-  } else {
-    stop("Clustering method '", method, "' is not currently supported. Stopping...")
+  # check to make sure that all events were assigned
+  if(any(is.na(experiment$mergedExpr$RPclust))){
+    stop("Not all events were assigned to a cluster. Please contact the package developer for assistance.")
   }
   
   ###################################################################
@@ -514,6 +489,10 @@ clusterDiscovrExperiment <- function(
   experiment$clusterMethod                 <- method
   experiment$phenographClusterK            <- k
   experiment$clusterSeed                   <- seed
+  experiment$clusterSetSeedOncePer         <- setSeedOncePer
+  # Leiden settings are stored only when they were used; remove any left from a previous run
+  experiment$leidenResolution              <- if(method == "leiden") leidenResolution else NULL
+  experiment$leidenIterations              <- if(method == "leiden") leidenIterations else NULL
   experiment$clusterRarePopCts             <- clusterRarePopCts
 
   return(experiment)
