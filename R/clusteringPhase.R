@@ -92,15 +92,17 @@ setupDiscovrExperiment <- function(
   }
   # set colnames of marker info data for consistency
   markerInfo <- dplyr::rename(markerInfo, commonMarkerName = !!markerCommonField, fcsMarkerName = !!markerFcsField)
+  # check for missing marker names; this must come before make.names(), which turns
+  # blank or NA names into "X" or "NA." (read.csv reads blank cells here as NA)
+  if(any(is.na(markerInfo$commonMarkerName) | trimws(markerInfo$commonMarkerName) == "")){
+    stop("Markers without assigned names were detected in the markerInfo file. Please correct the file and try again.")
+  }
   # make sure common names are valid
   markerInfo$commonMarkerName <- make.names(markerInfo$commonMarkerName)
 
   # check for appropriate marker names
   if(nrow(markerInfo) > length(unique(markerInfo$commonMarkerName))){
     stop("Marker names in the ", markerCommonField, " column of the markerInfo file do not appear to be unique. Please correct this and try again.")
-  }
-  if(any(markerInfo$commonMarkerName == "")){
-    stop("Markers without assigned names were detected in the markerInfo file. Please correct the file and try again.")
   }
 
   # check normalizationMethod, and set to zScore if not present

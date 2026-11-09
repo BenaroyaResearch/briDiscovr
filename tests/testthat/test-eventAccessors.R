@@ -33,11 +33,6 @@ markersInData <- function(experiment){
 
 test_that("getEventIntensities and getEventZScores work with default markers", {
   skipIfNoExampleData()
-  skip(paste(
-    "Known bug: the default for 'markers' is every marker in markerInfo, including markers",
-    "that setupDiscovrExperiment() dropped (here FSC.A and FSC.H, which have no FCS",
-    "description), so the 'markers' filter check fails. Remove this skip once fixed."
-  ))
   metaclustered <- getExampleExperiment("metaclustered")
   expect_no_error(suppressMessages(getEventIntensities(metaclustered)))
   expect_no_error(suppressMessages(getEventZScores(metaclustered, subjects = "donor1")))

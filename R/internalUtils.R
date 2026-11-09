@@ -66,7 +66,9 @@ isUnsetArgument <- function(x){
 getColorList <- function(n, seed = 42){
   set.seed(seed)
   qualColorPals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
-  allColors = unlist(mapply(RColorBrewer::brewer.pal, qualColorPals$maxcolors, rownames(qualColorPals)))
+  # some colors appear in more than one palette; keep each color once so that
+  # different metaclusters do not get the same color
+  allColors = unique(unlist(mapply(RColorBrewer::brewer.pal, qualColorPals$maxcolors, rownames(qualColorPals))))
 
   retList = c()
 

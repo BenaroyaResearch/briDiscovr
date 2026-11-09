@@ -21,7 +21,7 @@ getEventZScores(
 
 \item{subjects}{A string or vector of strings indicating which subjects to return event z-scores from}
 
-\item{markers}{A string or vector of strings indicating which markers to return event z-scores from}
+\item{markers}{A string or vector of strings indicating which markers to return event z-scores from (default: all markers in the expression data)}
 }
 \value{
 A data frame containing event z-scores (computed per-subject) from the events satisfying the requested filters. For any filter field without a specified value, all possible events will be returned.

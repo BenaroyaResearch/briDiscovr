@@ -11,6 +11,7 @@ plotDensityNormalizedExprsDiscovrExperiment(
   filenameOut = NULL,
   width = 12,
   height = 6,
+  res = 300,
   ...
 )
 }
@@ -45,6 +46,8 @@ which can be "pdf", "png", or "svg".}
 \item{width}{(default: 12) Numeric, width of output plot device in inches}
 
 \item{height}{(default: 6) Numeric, height of output plot device in inches}
+
+\item{res}{(default: 300) Numeric, resolution in pixels per inch, used only for png, jpeg, and tiff output}
 
 \item{...}{optional arguments passed to \code{normalizeDiscovrExperiment}}
 }

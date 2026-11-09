@@ -10,11 +10,6 @@ test_that("getColorList returns the requested number of hex colors", {
 })
 
 test_that("getColorList returns distinct colors when enough are available", {
-  skip(paste(
-    "Known bug: the RColorBrewer qualitative palettes share 4 colors, so the pool",
-    "has 74 entries but 70 distinct colors; with the default seed, 12 colors (the",
-    "default number of metaclusters) include a duplicate. Remove this skip once fixed."
-  ))
   expect_equal(anyDuplicated(briDiscovr:::getColorList(12)), 0)
   expect_equal(anyDuplicated(briDiscovr:::getColorList(20)), 0)
   expect_equal(anyDuplicated(briDiscovr:::getColorList(70)), 0)
