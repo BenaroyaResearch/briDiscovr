@@ -131,12 +131,12 @@ test_that("setup checks the markerInfo file", {
 
 test_that("setup reports a marker with no name", {
   skipIfNoExampleData()
-  skip(paste(
-    "Known bug: marker names are passed through make.names() before the blank-name check,",
-    "so a blank name becomes 'NA.' and the check never triggers. Remove this skip once fixed."
-  ))
   expect_error(
     setupTwoDonors(writeMarkerInfo(function(m){ m$fixed[12] <- ""; m })),
+    "Markers without assigned names"
+  )
+  expect_error(
+    setupTwoDonors(writeMarkerInfo(function(m){ m$fixed[12] <- "  "; m })),
     "Markers without assigned names"
   )
 })

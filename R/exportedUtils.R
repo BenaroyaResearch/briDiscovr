@@ -185,7 +185,7 @@ getMetaclusterOccupancy <- function(experiment, precision=2){
 #' @param cellSubsets A string or vector of strings indicating which cell subsets to return event intensities from
 #' @param metaclusters An integer or vector of integers indicating which metaclusters to return event intensities from
 #' @param subjects A string or vector of strings indicating which subjects to return event intensities from
-#' @param markers A string or vector of strings indicating which markers to return event intensities from
+#' @param markers A string or vector of strings indicating which markers to return event intensities from (default: all markers in the expression data)
 #' @return A data frame containing arcsinh-transformed event intensities from the events satisfying the requested filters. For any filter field without a specified value, all possible events will be returned.
 #'
 #' @author Mario G Rosasco
@@ -224,7 +224,9 @@ getEventIntensities <- function(experiment, cellSubsets = NA, metaclusters = NA,
     subjects <- unique(experiment$mergedExpr$samp)
   }
   if(isUnsetArgument(markers)){
-    markers <- unique(experiment$markerInfo$commonMarkerName)
+    # only markers present in the expression data (markerInfo can list markers that
+    # setupDiscovrExperiment() dropped, e.g. channels with no description in the FCS files)
+    markers <- intersect(unique(experiment$markerInfo$commonMarkerName), colnames(experiment$mergedExpr))
   }
   if(isUnsetArgument(metaclusters)){
     metaclusters <- 1:experiment$nMetaclusters
@@ -294,7 +296,7 @@ getEventIntensities <- function(experiment, cellSubsets = NA, metaclusters = NA,
 #' @param cellSubsets A string or vector of strings indicating which cell subsets to return event z-scores from
 #' @param metaclusters An integer or vector of integers indicating which metaclusters to return event z-scores from
 #' @param subjects A string or vector of strings indicating which subjects to return event z-scores from
-#' @param markers A string or vector of strings indicating which markers to return event z-scores from
+#' @param markers A string or vector of strings indicating which markers to return event z-scores from (default: all markers in the expression data)
 #' @return A data frame containing event z-scores (computed per-subject) from the events satisfying the requested filters. For any filter field without a specified value, all possible events will be returned.
 #'
 #' @author Mario G Rosasco
@@ -333,7 +335,9 @@ getEventZScores <- function(experiment, cellSubsets = NA, metaclusters = NA, sub
     subjects <- unique(experiment$mergedExpr$samp)
   }
   if(isUnsetArgument(markers)){
-    markers <- unique(experiment$markerInfo$commonMarkerName)
+    # only markers present in the expression data (markerInfo can list markers that
+    # setupDiscovrExperiment() dropped, e.g. channels with no description in the FCS files)
+    markers <- intersect(unique(experiment$markerInfo$commonMarkerName), colnames(experiment$mergedExpr))
   }
   if(isUnsetArgument(metaclusters)){
     metaclusters <- 1:experiment$nMetaclusters
@@ -649,7 +653,7 @@ downsampleFcsList <- function(
   }
   
   # set popsToDownsample
-  if(popsToDownsample == "all")
+  if(identical(popsToDownsample, "all"))
     popsToDownsample <- unique(fcsInfo$cellSubset)
   if(!all(popsToDownsample %in% fcsInfo$cellSubset))
     stop("Some populations specified in 'popsToDownsample' were not found in the FCS info file. Please verify that the populations to be downsampled match values in the 'cellSubset' of the FCS info file.")
@@ -1140,7 +1144,7 @@ runUmapDiscovrExperiment <- function(
         mapply(\(nCellsBySampCellSubset, nCellsToKeep) round(seq(from = 1, to = nCellsBySampCellSubset, length.out = nCellsToKeep)),
                exprDataCellsToKeepBySampCellSubset$nCellsBySampCellSubset, exprDataCellsToKeepBySampCellSubset$nCellsToKeep)
       exprDataCellsToKeepBySampCellSubset <-
-        unnest(exprDataCellsToKeepBySampCellSubset, cols = rowNumberBySampCellSubset) %>%
+        tidyr::unnest(exprDataCellsToKeepBySampCellSubset, cols = rowNumberBySampCellSubset) %>%
         mutate(keepCell = TRUE)
 
       # filter the expression data
@@ -1238,6 +1242,7 @@ runUmapDiscovrExperiment <- function(
 #' which can be "pdf", "png", or "svg".
 #' @param width (default: 12) Numeric, width of output plot device in inches
 #' @param height (default: 6) Numeric, height of output plot device in inches
+#' @param res (default: 300) Numeric, resolution in pixels per inch, used only for png, jpeg, and tiff output
 #' @param ... optional arguments passed to \code{normalizeDiscovrExperiment}
 #' @import ggplot2
 #' @importFrom stringr str_extract str_to_lower
@@ -1254,7 +1259,7 @@ plotDensityNormalizedExprsDiscovrExperiment <- function(
     clusteringMarkersOnly = TRUE,
     normalizationInfo = NULL,
     filenameOut = NULL,
-    width = 12, height = 6,
+    width = 12, height = 6, res = 300,
     ...
 ){
   # check that the experiment is a discovrExperiment
@@ -1325,11 +1330,11 @@ plotDensityNormalizedExprsDiscovrExperiment <- function(
         if(extensionOut == "pdf") {
       pdf(file = filenameOut, width = width, height = height)
     } else if(extensionOut == "png") {
-      png(filename = filenameOut, width = width, height = height, units = "inches")
+      png(filename = filenameOut, width = width, height = height, units = "in", res = res)
     } else if(extensionOut == "jpeg") {
-      jpeg(filename = filenameOut, width = width, height = height, units = "inches")
+      jpeg(filename = filenameOut, width = width, height = height, units = "in", res = res)
     } else if(extensionOut == "tiff") {
-      tiff(filename = filenameOut, width = width, height = height, units = "inches")
+      tiff(filename = filenameOut, width = width, height = height, units = "in", res = res)
     } else if(extensionOut == "svg") {
       svg(filename = filenameOut, width = width, height = height)
     }

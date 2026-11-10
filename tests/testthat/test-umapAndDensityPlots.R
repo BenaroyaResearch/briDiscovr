@@ -24,10 +24,6 @@ test_that("UMAP by frequency keeps 1 of every n events per sample and cell subse
 
 test_that("UMAP by number keeps at most n events per sample and cell subset", {
   skipIfNoExampleData()
-  skip(paste(
-    "Known bug: downsampleBy = \"number\" calls unnest() without importing it from tidyr,",
-    "so it fails unless tidyr is attached. Remove this skip once fixed."
-  ))
   metaclustered <- getExampleExperiment("metaclustered")
   umapData <- suppressMessages(runUmapDiscovrExperiment(
     metaclustered, downsampleBy = "number",
@@ -105,16 +101,24 @@ test_that("density plots can be written to a PDF file", {
   expect_identical(readBin(outFile, "raw", 4), charToRaw("%PDF"))
 })
 
-test_that("density plots can be written to a PNG file", {
+test_that("density plots can be written to PNG, JPEG, and TIFF files", {
   skipIfNoExampleData()
-  skip(paste(
-    "Known bug: png(), jpeg() and tiff() are called with units = \"inches\", but these",
-    "devices accept only \"in\", \"px\", \"cm\" or \"mm\". Remove this skip once fixed."
-  ))
   normalized <- getExampleExperiment("normalized")
-  outFile <- file.path(withr::local_tempdir(), "densities.png")
-  plotDensityNormalizedExprsDiscovrExperiment(normalized, filenameOut = outFile)
-  expect_true(file.exists(outFile))
+  outDir <- withr::local_tempdir()
+  # first bytes of each file format
+  signatures <- list(
+    png = as.raw(c(0x89, 0x50, 0x4e, 0x47)),
+    jpeg = as.raw(c(0xff, 0xd8, 0xff)),
+    tiff = NULL # "II*" or "MM*", depending on byte order
+  )
+  for(format in names(signatures)){
+    outFile <- file.path(outDir, paste0("densities.", format))
+    plotDensityNormalizedExprsDiscovrExperiment(normalized, filenameOut = outFile, width = 4, height = 2, res = 50)
+    expect_true(file.exists(outFile), info = format)
+    if(!is.null(signatures[[format]])){
+      expect_identical(readBin(outFile, "raw", length(signatures[[format]])), signatures[[format]], info = format)
+    }
+  }
 })
 
 test_that("density plots normalize a clustered experiment first", {

@@ -95,10 +95,6 @@ test_that("downsampleFcsList downsamples only the requested population", {
 
 test_that("downsampleFcsList accepts more than one population", {
   skipIfNoExampleData()
-  skip(paste(
-    "Known bug: downsampleFcsList uses `if(popsToDownsample == \"all\")`, which errors in",
-    "R >= 4.2 when more than one population is given. Remove this skip once fixed."
-  ))
   paths <- exampleDataPaths(c("donor1", "donor2"))
   rows <- downsampleFcsList(paths$fcsInfoFile, popsToDownsample = c("Tet-", "Tet+"), maxEvents = 300, verbose = FALSE)
   expect_true(all(lengths(rows) == 300))
