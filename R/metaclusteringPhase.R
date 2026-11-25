@@ -74,6 +74,9 @@ metaclusterDiscovrExperiment <- function(
     experiment <- normalizeDiscovrExperiment(experiment)
   }
 
+  # store cellSubset compactly (sharing is lost if the experiment was saved and reloaded)
+  experiment <- shareExperimentCellSubset(experiment)
+
   #########################################################################
   # Section 3.b.i-ix from original SOP - Set up metaclustering
   #########################################################################
@@ -126,23 +129,18 @@ metaclusterDiscovrExperiment <- function(
         c(experiment$clusterRarePopCts$sampRpClust, sampTotalParentNames)
     )
 
-  # remove samples to be dropped and low-abundance clusters from expr data
-  experiment$mergedExpr <-
-    experiment$mergedExpr %>%
-    dplyr::filter(!(samp %in% dropSamples)) %>%
-    dplyr::mutate(
-      RPclust = as.character(RPclust),
-      sampRpClust = paste0(samp, "_", RPclust)
-    ) %>%
-    dplyr::filter(sampRpClust %in% experiment$clusterRarePopCts$sampRpClust)
-  experiment$mergedExprNormalizedScaled <-
-    experiment$mergedExprNormalizedScaled %>%
-    dplyr::filter(!(samp %in% dropSamples)) %>%
-    dplyr::mutate(
-      RPclust = as.character(RPclust),
-      sampRpClust = paste0(samp, "_", RPclust)
-    ) %>%
-    dplyr::filter(sampRpClust %in% experiment$clusterRarePopCts$sampRpClust)
+  # remove samples to be dropped and low-abundance clusters from expr data;
+  # columns that are the same in both tables (e.g. samp, cellSubset, RPclust)
+  # are filtered once and shared between them (see filterEventsToClusters)
+  filteredEventTables <- filterEventsToClusters(
+    experiment$mergedExpr,
+    experiment$mergedExprNormalizedScaled,
+    clustersToKeep = experiment$clusterRarePopCts$sampRpClust,
+    dropSamples = dropSamples
+  )
+  experiment$mergedExpr <- filteredEventTables$mergedExpr
+  experiment$mergedExprNormalizedScaled <- filteredEventTables$mergedExprNormalizedScaled
+  rm(filteredEventTables)
 
   # format means for ease of use
   subjectMeansNormalizedScaled <- experiment$clusterMeansNormalizedScaled %>%

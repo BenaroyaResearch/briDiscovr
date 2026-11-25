@@ -160,100 +160,95 @@ setupDiscovrExperiment <- function(
   # Section 2.c.i-iii from original SOP load and format input
   ###########################################################
 
-  ## Read in FCS files and associate with cell subsets and subjects
-  # this code uses a single object that is modified rather than copied to avoid duplicating large chunks of data
-  # if this is not the most efficient way to handle memory here, then we should change it
-  # intent is to clean up garbage as we go and limit the max memory requirement
-  fcsListBySubjectCellSubset <- list()
-  for (currSubject in unique(fcsInfo$subject)){
-    if(verbose){message(paste0("Assigning per-subset data for sample: ", currSubject, "..."))}
-    fcsListBySubjectCellSubset[[currSubject]] <-
+  ## Read in FCS files and associate with cell subsets and subjects.
+  # To limit peak memory, files are processed one subject at a time: each
+  # subject's files are read, downsampled, trimmed to the markers in markerInfo,
+  # merged (parent population first), and arcsinh-transformed before the next
+  # subject's files are read. Only one subject's full-width FCS data is in memory
+  # at any time.
+  cellSubsetNames <- c(parentPopulation, setdiff(unique(fcsInfo$cellSubset), parentPopulation))
+  allSubjects <- unique(fcsInfo$subject)
+  # transformed expression for each subject, stored as a list of marker columns
+  exprColumnsBySubject <- list()
+  # the cell subset row counts for each subject's data (for use later in building mergedExpr)
+  cellSubsetCountsBySubject <- list()
+  markerColumnNames <- NULL
+  for (currSubject in allSubjects){
+    currSubjectName <- as.character(currSubject)
+    if(verbose){message(paste0("Reading and processing data for sample: ", currSubjectName, "..."))}
+    fcsListCurrSubject <-
       buildFcsList(
         fcsInfo %>% dplyr::filter(subject == currSubject), indexField = "cellSubset", truncate_max_range = FALSE)
-    # downsample each flowFrame within the FCSList for each subject
+    # downsample each flowFrame for the current subject
     if(!is.null(downsampleVectorList)) {
       currDownsampleVectorList <-
         downsampleVectorList[which(fcsInfo$subject == currSubject)]
-      for(currFcsNum in seq_len(length(fcsListBySubjectCellSubset[[currSubject]])))
+      for(currFcsNum in seq_len(length(fcsListCurrSubject)))
         if(!identical(currDownsampleVectorList[[currFcsNum]], "all")) # skip downsampling if "all" rows specified
-          fcsListBySubjectCellSubset[[currSubject]][[currFcsNum]] <-
-            fcsListBySubjectCellSubset[[currSubject]][[currFcsNum]][currDownsampleVectorList[[currFcsNum]],]
+          fcsListCurrSubject[[currFcsNum]] <-
+            fcsListCurrSubject[[currFcsNum]][currDownsampleVectorList[[currFcsNum]],]
     }
+
+    # clean and select markers according to markerInfo
+    fcsListCurrSubject <- lapply(fcsListCurrSubject, processFcsList, markerInfo = markerInfo)
+
+    if(!parentPopulation %in% names(fcsListCurrSubject)){
+      stop("No data for the parent population '", parentPopulation, "' could be read for sample '",
+           currSubjectName, "'. Please check the .fcs files for this sample.")
+    }
+
+    # merge data (parent population first, then other cell subsets in order)
+    cellSubsetOrderCurrSubject <- na.omit(match(cellSubsetNames, names(fcsListCurrSubject)))
+    cellSubsetCountsBySubject[[currSubjectName]] <-
+      sapply(fcsListCurrSubject[cellSubsetOrderCurrSubject], nrow, USE.NAMES = TRUE)
+    exprCurrSubject <- do.call(rbind, lapply(fcsListCurrSubject[cellSubsetOrderCurrSubject], flowCore::exprs))
+    rm(fcsListCurrSubject)
+
+    # all samples must have the same markers, in the same order
+    if(is.null(markerColumnNames)){
+      markerColumnNames <- colnames(exprCurrSubject)
+    } else if(!identical(colnames(exprCurrSubject), markerColumnNames)){
+      stop(
+        "After selecting markers according to markerInfo, sample '", currSubjectName,
+        "' has different markers than the first sample. Markers in the first sample: ",
+        paste(markerColumnNames, collapse = ", "), ". Markers in sample '", currSubjectName, "': ",
+        paste(colnames(exprCurrSubject), collapse = ", "), ".")
+    }
+
+    # arcsinh transform; this is the same calculation as flowCore::arcsinhTransform()
+    exprCurrSubject <- asinh(arcsinhA + arcsinhB * exprCurrSubject) + arcsinhC
+
+    # store as a list of columns, so that columns can be released one at a time below
+    exprColumnsBySubject[[currSubjectName]] <-
+      lapply(stats::setNames(seq_len(ncol(exprCurrSubject)), markerColumnNames), \(j) exprCurrSubject[, j])
+    rm(exprCurrSubject)
   }
-
-  if(verbose){message("Cleaning and selecting markers from .fcs files according to markerInfo file...")}
-
-  for (currSubject in names(fcsListBySubjectCellSubset)){
-    fcsListBySubjectCellSubset[[currSubject]] <-
-      lapply(fcsListBySubjectCellSubset[[currSubject]], processFcsList, markerInfo = markerInfo)
-  }
-
-  if(verbose){message("Merging data (parent and child populations)...")}
-  cellSubsetNames <- c(parentPopulation, setdiff(unique(fcsInfo$cellSubset), parentPopulation))
-  # store the cell subset row counts for each subject's data (for use later in building mergedExpr)
-  cellSubsetCountsBySubject <-
-    lapply(fcsListBySubjectCellSubset,
-           \(x) sapply(x[na.omit(match(cellSubsetNames, names(x)))], nrow, USE.NAMES = TRUE))
-  
-  # create object to store data merged by subject
-  fcsListBySubjectMerged <- list()
-  for(currSubject in names(fcsListBySubjectCellSubset)){
-    # start with parentPopulation
-    fcsListBySubjectMerged[[currSubject]] <- fcsListBySubjectCellSubset[[currSubject]][[parentPopulation]]
-    # merge values into parent population, in same order
-    exprs(fcsListBySubjectMerged[[currSubject]]) <-
-      rbind(
-        exprs(fcsListBySubjectMerged[[currSubject]]),
-        do.call(
-          rbind,
-          lapply(
-            fcsListBySubjectCellSubset[[currSubject]][
-              na.omit(
-                match(setdiff(cellSubsetNames, parentPopulation),
-                      names(fcsListBySubjectCellSubset[[currSubject]]))
-              )],
-            exprs)))
-  }
-  # remove previous large data object and do a garbage cleanup
-  rm(fcsListBySubjectCellSubset); gc()
-
-  # Transform the data
-  asinhTfmData <- function(fcs){
-    # Arcsinh transform remaining columns
-    tl <- transformList(
-      flowCore::colnames(fcs),
-      arcsinhTransform(a = arcsinhA, b = arcsinhB, c = arcsinhC),
-      transformationId = "asinh"
-    )
-    fcs <- flowCore::transform(fcs, tl)
-  }
-
-  # transform and convert object to a flowSet for easier use downstream
   if(verbose){
-    message("Transforming data using arcsinh(a=", arcsinhA, ", b=", arcsinhB, ", c=", arcsinhC, ")...")
+    message("Transformed data using arcsinh(a=", arcsinhA, ", b=", arcsinhB, ", c=", arcsinhC, ").")
+    message("Merging data across samples...")
   }
-  fcsListBySubjectMerged <- as(lapply(fcsListBySubjectMerged, asinhTfmData), "flowSet")
-  
-  # Extract expression data and label Tmr+ events
-  mergedExprStructureOnly <-
-    setNames(
-      data.frame(matrix(data = NA_real_, ncol = ncol(exprs(fcsListBySubjectMerged[[1]])), nrow = 0)),
-      flowCore::colnames(fcsListBySubjectMerged))
-  mergedExprStructureOnly$samp <- character()
-  mergedExprStructureOnly$cellSubset <- list()
-  # mergedExprStructureOnly$cellSubset <- character() # potential future change: make cellSubset a character vector
-  
+
+  # Combine samples one marker column at a time, releasing each sample's copy
+  # of a column once it has been combined. This keeps peak memory close to the
+  # size of the final data rather than twice that size.
   mergedExpr <- list()
-  for(currSubjectNum in seq_len(length(fcsListBySubjectMerged))){
-    mergedExpr[[currSubjectNum]] <- as.data.frame(flowCore::exprs(fcsListBySubjectMerged[[currSubjectNum]]))
-    mergedExpr[[currSubjectNum]]$samp <- as.character(names(cellSubsetCountsBySubject)[currSubjectNum])
-    # potential future change: make cellSubset a character vector; remove the as.list() from following lines
-    mergedExpr[[currSubjectNum]]$cellSubset <-
-      as.list(
-        rep(names(cellSubsetCountsBySubject[[currSubjectNum]]), times = cellSubsetCountsBySubject[[currSubjectNum]]))
+  for(currMarker in markerColumnNames){
+    mergedExpr[[currMarker]] <-
+      unlist(lapply(exprColumnsBySubject, `[[`, currMarker), use.names = FALSE)
+    exprColumnsBySubject <- lapply(exprColumnsBySubject, \(x) {x[[currMarker]] <- NULL; x})
   }
-  mergedExpr <- bind_rows(mergedExprStructureOnly, mergedExpr)
-  rm(fcsListBySubjectMerged); gc()
+  rm(exprColumnsBySubject)
+  nEventsBySubject <- sapply(cellSubsetCountsBySubject, sum)
+  mergedExpr$samp <- rep(names(cellSubsetCountsBySubject), times = nEventsBySubject)
+  # cellSubset is a list column (one element per event); events with the same
+  # cell subset share a single R object, which uses much less memory than
+  # giving each event its own copy (see shareCellSubsetElements())
+  cellSubsetIndex <- unlist(
+    lapply(cellSubsetCountsBySubject, \(x) rep(match(names(x), cellSubsetNames), times = x)),
+    use.names = FALSE)
+  mergedExpr$cellSubset <- as.list(cellSubsetNames)[cellSubsetIndex]
+  rm(cellSubsetIndex)
+  mergedExpr <- structure(mergedExpr, class = "data.frame", row.names = .set_row_names(length(mergedExpr$samp)))
 
   # building a discovr experiment S3 object
   experiment <- structure(list(), class = "discovrExperiment")
@@ -385,10 +380,15 @@ clusterDiscovrExperiment <- function(
   # Clustering markers object is defined in the first set-up chunk.  Tweak which markers are included up there.
   # The steps for one sample are in clusterEvents() (R/clusteringInternals.R).
 
-  # initialize RPclust
-  experiment$mergedExpr$RPclust <- NA
+  # store cellSubset compactly (sharing is lost if the experiment was saved and reloaded)
+  experiment <- shareExperimentCellSubset(experiment)
+
+  # cluster labels are collected in a vector and added to mergedExpr once, after
+  # all samples are clustered, rather than modifying mergedExpr for each sample
+  clusterLabelsAllEvents <- rep(NA_real_, nrow(experiment$mergedExpr))
   # cluster events within each subject
   allSubjects <- unique(experiment$mergedExpr$samp)
+  rowsBySubject <- split(seq_len(nrow(experiment$mergedExpr)), experiment$mergedExpr$samp)
   for(currSubj in allSubjects){
     if(verbose){
       message("\nClustering sample ", match(currSubj, allSubjects), " of ", length(allSubjects), "...")
@@ -396,9 +396,9 @@ clusterDiscovrExperiment <- function(
     if(setSeedOncePer == "sample"){
       set.seed(seed)
     }
-    isCurrSubj <- experiment$mergedExpr$samp == currSubj
+    currSubjRows <- rowsBySubject[[currSubj]]
     clusterLabels <- clusterEvents(
-      data = experiment$mergedExpr[isCurrSubj, experiment$clusteringMarkers],
+      data = experiment$mergedExpr[currSubjRows, experiment$clusteringMarkers],
       method = method,
       k = k,
       nThreads = nThreads,
@@ -407,34 +407,35 @@ clusterDiscovrExperiment <- function(
       verbose = verbose
     )
     # add cluster IDs
-    experiment$mergedExpr[isCurrSubj, "RPclust"] <- as.numeric(clusterLabels)
+    clusterLabelsAllEvents[currSubjRows] <- as.numeric(clusterLabels)
   }
+  rm(rowsBySubject)
   # check to make sure that all events were assigned
-  if(any(is.na(experiment$mergedExpr$RPclust))){
+  if(any(is.na(clusterLabelsAllEvents))){
     stop("Not all events were assigned to a cluster. Please contact the package developer for assistance.")
   }
+  experiment$mergedExpr$RPclust <- clusterLabelsAllEvents
+  rm(clusterLabelsAllEvents)
   
   ###################################################################
   # Sections 2.e.i from original SOP - Summarize and save outputs
   ###################################################################
   
   # Calculate mean expression value of each marker for each phenograph cluster in each subject
+  # duplicated rows are removed before averaging, because mergedExpr has both parent and gated events;
+  # this is computed one sample at a time to limit memory use (see summariseDistinctMeansBySample)
   clusterMeans <- experiment$mergedExpr %>%
     dplyr::select(-cellSubset) %>%
-    distinct() %>% # remove duplicated rows; mergedExpr has both parent and gated
-    dplyr::group_by(samp, RPclust) %>%
-    dplyr::summarise_all(mean) %>%
+    summariseDistinctMeansBySample(groupCols = c("samp", "RPclust")) %>%
     dplyr::mutate(RPclust = as.character(RPclust))
   # maybe should ungroup here, but concerned about breaking things
-  
+
 
   ##################################
   # Calculate total mean expression for each subject
   parentMeans <- experiment$mergedExpr %>%
     dplyr::select(-cellSubset, -RPclust) %>%
-    distinct() %>% # remove duplicated rows; mergedExpr has both parent and gated
-    dplyr::group_by(samp) %>%
-    dplyr::summarise_all(mean) %>%
+    summariseDistinctMeansBySample(groupCols = "samp") %>%
     dplyr::mutate(RPclust = "Total_Parent")
   # maybe should ungroup here, but concerned about breaking things
 
@@ -650,33 +651,40 @@ normalizeDiscovrExperiment <- function(
   if (!all(sapply(experiment$mergedExpr[, markersToNormalize], is.numeric)))
     stop("Only numeric values are allow in 'mergedExpr' marker expression levels.")
   
+  # store cellSubset compactly (sharing is lost if the experiment was saved and reloaded)
+  experiment <- shareExperimentCellSubset(experiment)
+
+  # Normalization is applied one marker column at a time, replacing that column
+  # in place, to limit peak memory. The calculations are the same as applying
+  # scale() to several columns at once, because scale() treats each column
+  # independently. Columns that are not modified (e.g. samp and cellSubset) are
+  # shared with experiment$mergedExpr rather than copied.
   mergedExprNormalizedScaled <- experiment$mergedExpr
-  
+
   # apply z-score normalization to each sample, for all markers with z-score normalization specified
-  for (samp.tmp in unique(experiment$mergedExpr$samp)) {
-    mergedExprNormalizedScaled[
-      mergedExprNormalizedScaled$samp == samp.tmp,
-      match(
-        normalizationInfo$commonMarkerName[
-          (normalizationInfo$commonMarkerName %in% markersToNormalize) &
-          (normalizationInfo$normalizationMethod %in% "zScore")],
-            colnames(mergedExprNormalizedScaled))] <-
-      scale(
-        mergedExprNormalizedScaled[
-          mergedExprNormalizedScaled$samp == samp.tmp,
-          match(
-            normalizationInfo$commonMarkerName[
-              (normalizationInfo$commonMarkerName %in% markersToNormalize) &
-                (normalizationInfo$normalizationMethod %in% "zScore")],
-            colnames(mergedExprNormalizedScaled))])
+  zScoreMarkers <-
+    normalizationInfo$commonMarkerName[
+      (normalizationInfo$commonMarkerName %in% markersToNormalize) &
+        (normalizationInfo$normalizationMethod %in% "zScore")]
+  if(length(zScoreMarkers) > 0){
+    rowsBySample <- split(seq_len(nrow(mergedExprNormalizedScaled)), mergedExprNormalizedScaled$samp)
+    for(currMarker in zScoreMarkers){
+      currValues <- mergedExprNormalizedScaled[[currMarker]]
+      for(currRows in rowsBySample){
+        currValues[currRows] <- as.vector(scale(currValues[currRows]))
+      }
+      mergedExprNormalizedScaled[[currMarker]] <- currValues
+      rm(currValues)
+    }
+    rm(rowsBySample)
   }
-  
+
   # apply warpSet normalization to each marker, iterating over variations with different numbers of peaks specified
   if(any(str_detect(normalizationInfo$normalizationMethod[normalizationInfo$commonMarkerName %in% markersToNormalize], "warpSet"))){
     if(verbose)
       message("Starting warpSet normalization on select markers")
-    
-    for(warpSetMethod in 
+
+    for(warpSetMethod in
         unique(grep("^warpSet[0-9]*$",
                     normalizationInfo$normalizationMethod[normalizationInfo$commonMarkerName %in% markersToNormalize],
                     value = TRUE))){
@@ -684,45 +692,41 @@ normalizeDiscovrExperiment <- function(
         if(str_detect(warpSetMethod, "(?<=warpSet)[0-9]+")){
           as.numeric(str_extract(warpSetMethod, "(?<=warpSet)[0-9]+"))
         } else NULL
-      mergedExprNormalizedScaled[
-        ,
-        c(
-          normalizationInfo$commonMarkerName[
-            (normalizationInfo$commonMarkerName %in% markersToNormalize) &
-              (normalizationInfo$normalizationMethod == warpSetMethod)], "samp")] <-
-        normalizeWarpSetMergedExpr(
-          mergedExprNormalizedScaled[
-            ,
-            c(
-              normalizationInfo$commonMarkerName[
-                (normalizationInfo$commonMarkerName %in% markersToNormalize) &
-                  (normalizationInfo$normalizationMethod == warpSetMethod)], "samp")],
-          peakNr = maxPeakNr, groupCol = "samp", seed = seed)
+      warpSetMarkers <-
+        normalizationInfo$commonMarkerName[
+          (normalizationInfo$commonMarkerName %in% markersToNormalize) &
+            (normalizationInfo$normalizationMethod == warpSetMethod)]
+      # each marker is normalized separately (see normalizeWarpSetMergedExpr)
+      for(currMarker in warpSetMarkers){
+        mergedExprNormalizedScaled[[currMarker]] <-
+          normalizeWarpSetMergedExpr(
+            mergedExprNormalizedScaled[, c(currMarker, "samp")],
+            peakNr = maxPeakNr, groupCol = "samp", seed = seed)[[currMarker]]
+      }
     }
   }
-  
+
   # for normalizationMethod "none": no change applied
-  
+
   # scale each marker to have comparable weight in metaclustering
-  mergedExprNormalizedScaled[, markersToNormalize] <-
-    scale(mergedExprNormalizedScaled[, markersToNormalize])
-  
+  for(currMarker in markersToNormalize){
+    mergedExprNormalizedScaled[[currMarker]] <- as.vector(scale(mergedExprNormalizedScaled[[currMarker]]))
+  }
+
   # skip calculation of marker means by cluster if experiment not clustered yet (only really used when running UMAP prior to clustering)
   if("RPclust" %in% colnames(mergedExprNormalizedScaled)){
     # Calculate mean expression value (scaled and normalized) of each marker for each phenograph cluster in each subject
+    # duplicated rows are removed before averaging, because mergedExprNormalizedScaled has both parent and gated events;
+    # this is computed one sample at a time to limit memory use (see summariseDistinctMeansBySample)
     clusterMeansNormalizedScaled <- mergedExprNormalizedScaled %>%
       dplyr::select(-cellSubset) %>%
-      distinct() %>% # remove duplicated rows; mergedExprNormalizedScaled has both parent and gated
-      dplyr::group_by(samp, RPclust) %>%
-      dplyr::summarise_all(mean) %>%
+      summariseDistinctMeansBySample(groupCols = c("samp", "RPclust")) %>%
       dplyr::mutate(RPclust = as.character(RPclust))
-    
+
     # Calculate total mean expression (scaled and normalized) for each subject
     parentMeansNormalizedScaled <- mergedExprNormalizedScaled %>%
       dplyr::select(-cellSubset, -RPclust) %>%
-      distinct() %>% # remove duplicated rows; mergedExprNormalizedScaled has both parent and gated
-      dplyr::group_by(samp) %>%
-      dplyr::summarise_all(mean) %>%
+      summariseDistinctMeansBySample(groupCols = "samp") %>%
       dplyr::mutate(RPclust = "Total_Parent")
   }
     

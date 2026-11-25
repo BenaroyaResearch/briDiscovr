@@ -136,8 +136,9 @@ normalizeWarpSetMergedExpr <- function(mergedExpr, peakNr = NULL, groupCol = "sa
         match(mergedExpr$rowIdx, normMergedExprByMarker$rowIdx), marker.tmp]
   }
   
-  # sort normalized data, check it, and remove rowIdx
-  mergedExpr <- dplyr::arrange(mergedExpr, rowIdx)
+  # check normalized data and remove rowIdx
+  # (rows of mergedExpr are never reordered above, so no sorting is needed;
+  # sorting here would only make an extra copy of the data)
   mergedExpr[["rowIdx"]] <- NULL
   if(!(identical(colnames(mergedExpr), colnamesMergedExpr) &
        identical(mergedExpr[[groupCol]], groupColValuesMergedExpr)))
@@ -193,4 +194,133 @@ normalizeWarpSetSingleMarker <-
     stop("Something went wrong with warpSet normalization")
   
   return(normMergedExprByMarker)
+}
+
+# Private function to store the cellSubset list column compactly.
+# cellSubset has one element per event, each a character vector of one or more
+# cell subset names. If every event holds its own copy of e.g. "Tet-", each
+# element costs about 64 bytes; if all events with the same value point to one
+# shared R object, each costs only the 8-byte pointer. This function returns a
+# list in which events with the same value share one object. The contents are
+# unchanged: the result is identical() to the input, and changing one element
+# later (copy-on-modify) does not affect any other element.
+# Sharing is lost when an object is saved with saveRDS() and read back in, so
+# the pipeline functions call this (via shareExperimentCellSubset) on entry.
+shareCellSubsetElements <- function(cellSubset){
+  if(!is.list(cellSubset)) return(cellSubset)
+  cellSubsetValues <- if(all(lengths(cellSubset) == 1L)) unlist(cellSubset, use.names = FALSE) else NULL
+  if(is.character(cellSubsetValues)){
+    # usual case: a single cell subset name per event
+    uniqueValues <- unique(cellSubsetValues)
+    sharedCellSubset <- as.list(uniqueValues)[match(cellSubsetValues, uniqueValues)]
+  } else {
+    # general case (e.g. events with more than one cell subset)
+    uniqueValues <- unique(cellSubset)
+    sharedCellSubset <- uniqueValues[match(cellSubset, uniqueValues)]
+  }
+  # names on the list are not used by the package, but keep them if present
+  names(sharedCellSubset) <- names(cellSubset)
+  if(!identical(sharedCellSubset, cellSubset)){
+    # should never happen; fall back to the input rather than risk changing data
+    return(cellSubset)
+  }
+  sharedCellSubset
+}
+
+# Private function to apply shareCellSubsetElements() to the event-level data
+# frames in a discovrExperiment (mergedExpr and, if present, mergedExprNormalizedScaled)
+shareExperimentCellSubset <- function(experiment){
+  for(currElement in c("mergedExpr", "mergedExprNormalizedScaled")){
+    if(is.data.frame(experiment[[currElement]]) && is.list(experiment[[currElement]]$cellSubset)){
+      experiment[[currElement]]$cellSubset <- shareCellSubsetElements(experiment[[currElement]]$cellSubset)
+    }
+  }
+  experiment
+}
+
+# Private function to compute the mean of every column by group, after removing
+# duplicated rows, working on one sample at a time to limit peak memory.
+# `data` must include the column "samp" and all columns in `groupCols`, which
+# must start with "samp". The result is the same as
+#   data %>% dplyr::distinct() %>% dplyr::group_by(<groupCols>) %>% dplyr::summarise_all(mean)
+# because "samp" is part of the de-duplication key (rows from different samples
+# are never duplicates of each other), and the rows within each group are
+# averaged in the same order. Only one sample's rows are copied at a time,
+# instead of the whole data set.
+summariseDistinctMeansBySample <- function(data, groupCols = "samp"){
+  stopifnot(identical(groupCols[1], "samp"), all(groupCols %in% colnames(data)))
+  rowsBySample <- split(seq_len(nrow(data)), data$samp)
+  meansBySample <- lapply(
+    rowsBySample,
+    \(rows) data[rows, , drop = FALSE] %>%
+      dplyr::distinct() %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(groupCols))) %>%
+      dplyr::summarise_all(mean) %>%
+      dplyr::ungroup()
+  )
+  # combine, then restore the row order and grouping produced by summarise()
+  # on the whole data set (sorted by the grouping columns, and grouped by all
+  # but the last grouping column)
+  dplyr::bind_rows(meansBySample) %>%
+    dplyr::arrange(dplyr::across(dplyr::all_of(groupCols))) %>%
+    dplyr::group_by(dplyr::across(dplyr::all_of(groupCols[-length(groupCols)])))
+}
+
+# Private function to keep only the events in retained clusters, for the event
+# tables mergedExpr and mergedExprNormalizedScaled, and to add the columns used
+# downstream. For each table, the result is the same as
+#   data %>%
+#     dplyr::filter(!(samp %in% dropSamples)) %>%
+#     dplyr::mutate(RPclust = as.character(RPclust), sampRpClust = paste0(samp, "_", RPclust)) %>%
+#     dplyr::filter(sampRpClust %in% clustersToKeep)
+# but each table is copied once rather than twice, and the rows to keep are
+# found once. Columns that are identical in the two input tables (normally
+# samp, cellSubset and RPclust, which normalization does not change) are
+# filtered once and shared by the two results instead of being stored twice.
+# Returns a list with elements mergedExpr and mergedExprNormalizedScaled.
+filterEventsToClusters <- function(mergedExpr, mergedExprNormalizedScaled, clustersToKeep, dropSamples){
+  # filter one table, given the rows to keep and any columns already filtered
+  filterTable <- function(data, keep, newColumns, filteredColumns){
+    result <- list()
+    for(currColumn in colnames(data)){
+      result[[currColumn]] <-
+        if(currColumn %in% names(newColumns)) newColumns[[currColumn]]
+        else if(currColumn %in% names(filteredColumns)) filteredColumns[[currColumn]]
+        else data[[currColumn]][keep]
+    }
+    # new columns are added at the end, as mutate() does
+    for(currColumn in setdiff(names(newColumns), colnames(data))){
+      result[[currColumn]] <- newColumns[[currColumn]]
+    }
+    structure(result, class = class(data), row.names = .set_row_names(sum(keep)))
+  }
+
+  # rows to keep, and the new RPclust and sampRpClust columns, from mergedExpr
+  rpClustCharacter <- as.character(mergedExpr$RPclust)
+  sampRpClust <- paste0(mergedExpr$samp, "_", rpClustCharacter)
+  keep <- !(mergedExpr$samp %in% dropSamples) & (sampRpClust %in% clustersToKeep)
+  newColumns <- list(RPclust = rpClustCharacter[keep], sampRpClust = sampRpClust[keep])
+  rm(rpClustCharacter, sampRpClust)
+  filteredMergedExpr <- filterTable(mergedExpr, keep, newColumns, filteredColumns = list())
+
+  if(is.null(mergedExprNormalizedScaled)){
+    return(list(mergedExpr = filteredMergedExpr, mergedExprNormalizedScaled = NULL))
+  }
+
+  # mergedExprNormalizedScaled can reuse the rows to keep (and the new columns) only if
+  # its samp and RPclust columns match those of mergedExpr; otherwise filter it on its own
+  if(identical(mergedExprNormalizedScaled$samp, mergedExpr$samp) &&
+     identical(mergedExprNormalizedScaled$RPclust, mergedExpr$RPclust)){
+    sharedColumns <- intersect(colnames(mergedExprNormalizedScaled), colnames(mergedExpr))
+    sharedColumns <- sharedColumns[
+      vapply(sharedColumns, \(x) identical(mergedExprNormalizedScaled[[x]], mergedExpr[[x]]), logical(1))]
+    filteredNormalized <- filterTable(
+      mergedExprNormalizedScaled, keep, newColumns,
+      filteredColumns = filteredMergedExpr[sharedColumns])
+  } else {
+    filteredNormalized <- filterEventsToClusters(
+      mergedExprNormalizedScaled, NULL, clustersToKeep, dropSamples)$mergedExpr
+  }
+
+  list(mergedExpr = filteredMergedExpr, mergedExprNormalizedScaled = filteredNormalized)
 }
